@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Sherlock
+Icon=harbour-sherlock
+Exec=harbour-sherlock
+Categories=Game
+Type=Application
+X-Sailfish-ApplicationType=Silica
+
+
+[X-Sailjail]
+Sandboxing=Disabled

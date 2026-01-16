@@ -1,0 +1,187 @@
+[
+  {
+    "index": 0,
+    "label": "blank",
+    "file": "00_blank.png"
+  },
+  {
+    "index": 1,
+    "label": "A1",
+    "file": "01_A1.png"
+  },
+  {
+    "index": 2,
+    "label": "A2",
+    "file": "02_A2.png"
+  },
+  {
+    "index": 3,
+    "label": "A3",
+    "file": "03_A3.png"
+  },
+  {
+    "index": 4,
+    "label": "A4",
+    "file": "04_A4.png"
+  },
+  {
+    "index": 5,
+    "label": "A5",
+    "file": "05_A5.png"
+  },
+  {
+    "index": 6,
+    "label": "A6",
+    "file": "06_A6.png"
+  },
+  {
+    "index": 7,
+    "label": "B1",
+    "file": "07_B1.png"
+  },
+  {
+    "index": 8,
+    "label": "B2",
+    "file": "08_B2.png"
+  },
+  {
+    "index": 9,
+    "label": "B3",
+    "file": "09_B3.png"
+  },
+  {
+    "index": 10,
+    "label": "B4",
+    "file": "10_B4.png"
+  },
+  {
+    "index": 11,
+    "label": "B5",
+    "file": "11_B5.png"
+  },
+  {
+    "index": 12,
+    "label": "B6",
+    "file": "12_B6.png"
+  },
+  {
+    "index": 13,
+    "label": "C1",
+    "file": "13_C1.png"
+  },
+  {
+    "index": 14,
+    "label": "C2",
+    "file": "14_C2.png"
+  },
+  {
+    "index": 15,
+    "label": "C3",
+    "file": "15_C3.png"
+  },
+  {
+    "index": 16,
+    "label": "C4",
+    "file": "16_C4.png"
+  },
+  {
+    "index": 17,
+    "label": "C5",
+    "file": "17_C5.png"
+  },
+  {
+    "index": 18,
+    "label": "C6",
+    "file": "18_C6.png"
+  },
+  {
+    "index": 19,
+    "label": "D1",
+    "file": "19_D1.png"
+  },
+  {
+    "index": 20,
+    "label": "D2",
+    "file": "20_D2.png"
+  },
+  {
+    "index": 21,
+    "label": "D3",
+    "file": "21_D3.png"
+  },
+  {
+    "index": 22,
+    "label": "D4",
+    "file": "22_D4.png"
+  },
+  {
+    "index": 23,
+    "label": "D5",
+    "file": "23_D5.png"
+  },
+  {
+    "index": 24,
+    "label": "D6",
+    "file": "24_D6.png"
+  },
+  {
+    "index": 25,
+    "label": "E1",
+    "file": "25_E1.png"
+  },
+  {
+    "index": 26,
+    "label": "E2",
+    "file": "26_E2.png"
+  },
+  {
+    "index": 27,
+    "label": "E3",
+    "file": "27_E3.png"
+  },
+  {
+    "index": 28,
+    "label": "E4",
+    "file": "28_E4.png"
+  },
+  {
+    "index": 29,
+    "label": "E5",
+    "file": "29_E5.png"
+  },
+  {
+    "index": 30,
+    "label": "E6",
+    "file": "30_E6.png"
+  },
+  {
+    "index": 31,
+    "label": "F1",
+    "file": "31_F1.png"
+  },
+  {
+    "index": 32,
+    "label": "F2",
+    "file": "32_F2.png"
+  },
+  {
+    "index": 33,
+    "label": "F3",
+    "file": "33_F3.png"
+  },
+  {
+    "index": 34,
+    "label": "F4",
+    "file": "34_F4.png"
+  },
+  {
+    "index": 35,
+    "label": "F5",
+    "file": "35_F5.png"
+  },
+  {
+    "index": 36,
+    "label": "F6",
+    "file": "36_F6.png"
+  }
+]
