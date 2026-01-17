@@ -101,22 +101,9 @@ Page
 
             SilicaListView {
                 width: parent.width
-                height: Math.min(contentHeight, Screen.height * 0.45)
+                height: Math.min(contentHeight, Screen.height * 0.35)
                 model: sherlockEngine.clues
-
-                delegate: ListItem {
-                    width: ListView.view.width
-                    contentHeight: clueLabel.height + Theme.paddingMedium
-
-                    Label {
-                        id: clueLabel
-                        x: Theme.horizontalPageMargin
-                        width: parent.width - 2 * Theme.horizontalPageMargin
-                        wrapMode: Text.WordWrap
-                        text: modelData
-                        color: Theme.primaryColor
-                    }
-                }
+                delegate: Components.ClueStrip { }
             }
         }
     }

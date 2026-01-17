@@ -179,8 +179,14 @@ QVariantList SherlockEngine::clues() const
 {
     QVariantList out;
     out.reserve(m_clues.size());
-    for (const QString &s : m_clues)
-        out.push_back(s);
+    for (const auto &c : m_clues) {
+        QVariantMap m;
+        m["type"] = c.type;
+        m["row"]  = c.row;
+        m["col"]  = c.col;
+        m["item"] = c.item;
+        out.push_back(m);
+    }
     return out;
 }
 
@@ -188,45 +194,30 @@ void SherlockEngine::rebuildClues()
 {
     m_clues.clear();
 
-    // Placeholder: list givens
-    // Requires you already have fixedAt(row,col). If your fixedAt uses a bitmask, this still works.
     const int n = m_size;
-    int givens = 0;
+    const int cells = n * n;
 
-    for (int r = 0; r < n; ++r) {
-        for (int c = 0; c < n; ++c) {
-            if (!fixedAt(r, c))
-                continue;
+    for (int i = 0; i < cells; ++i) {
+        if (!m_fixed[i]) continue;
 
-            ++givens;
+        const int r = i / n;
+        const int c = i % n;
 
-            // If the cell is certain, show its value (A1-style)
-            const quint32 m = m_masks[idx(r, c)];
-            int item = -1;
-            if (m && ((m & (m - 1)) == 0)) {
-                // single bit -> index
-                for (int k = 0; k < n; ++k) {
-                    if (m == bit(k)) { item = k; break; }
-                }
-            }
-
-            const QString cell = QStringLiteral("%1%2")
-                .arg(QChar('A' + r))
-                .arg(c + 1);
-
-            if (item >= 0) {
-                const QString val = QStringLiteral("%1%2")
-                    .arg(QChar('A' + r))
-                    .arg(item + 1);
-                m_clues.push_back(QStringLiteral("Given: %1 is %2").arg(cell, val));
-            } else {
-                m_clues.push_back(QStringLiteral("Given: %1 is fixed").arg(cell));
-            }
+        // fixed mask -> item
+        int item = -1;
+        const quint32 mask = m_masks[i];
+        for (int k = 0; k < n; ++k) {
+            if (mask == (1u << k)) { item = k; break; }
         }
-    }
+        if (item < 0) continue;
 
-    if (givens == 0)
-        m_clues.push_back(QStringLiteral("No givens yet (placeholder clues)."));
+        Clue cl;
+        cl.type = 0; // Given
+        cl.row  = r;
+        cl.col  = c;
+        cl.item = item;
+        m_clues.push_back(cl);
+    }
 
     emit cluesChanged();
 }

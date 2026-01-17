@@ -13,7 +13,6 @@ class SherlockEngine : public QObject
     Q_OBJECT
     Q_PROPERTY(int size READ size WRITE setSize NOTIFY sizeChanged)
     Q_PROPERTY(QVariantList boardMasks READ boardMasks NOTIFY boardChanged)
-    Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
 
     Q_PROPERTY(bool hasImportedImages READ hasImportedImages NOTIFY imagesChanged)
     Q_PROPERTY(QString dataDir READ dataDir CONSTANT)
@@ -22,6 +21,7 @@ class SherlockEngine : public QObject
 
     Q_PROPERTY(int iconEpoch READ iconEpoch NOTIFY imagesChanged)
     int iconEpoch() const { return m_iconEpoch; }
+    Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
 
 public:
     enum IconSource {
@@ -106,7 +106,6 @@ private:
     // hidden solution (size*size entries, each 0..(size-1))
     QVector<int> m_solution;
 
-    QVector<QString> m_clues;
     void rebuildClues();   // placeholder generator for now
 
     // minimal generator (Latin-square-like; good enough for now)
@@ -115,4 +114,12 @@ private:
     void loadState();
     void saveState() const;
     QString settingsPathHint() const;
+
+    struct Clue {
+        int type;      // 0=Given (for now)
+        int row;       // 0..n-1
+        int col;       // 0..n-1
+        int item;      // 0..n-1 (solution value)
+    };
+    QVector<Clue> m_clues;
 };
