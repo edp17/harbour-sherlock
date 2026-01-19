@@ -1,61 +1,87 @@
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
-BackgroundItem {
+Item {
     id: root
-    width: parent ? parent.width : Screen.width
-    height: Theme.itemSizeSmall
-    highlightedColor: Theme.rgba(Theme.highlightColor, 0.15)
 
-    // modelData is a QVariantMap from engine.clues()
-    property var clue: modelData
+    // Expecting engine clue maps: { type, row, col, item }
+    // type: currently 0 = Given
+    property var clue: ({})
     property int n: sherlockEngine.size
+    property int iconPx: Theme.iconSizeMedium
+    property int epoch: sherlockEngine.iconEpoch
 
-    // Helper for generated icon filename for (row,item)
-    function genFileName(row, item) {
-        var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
-        var colNumber = item + 1
-        // generated set is 01_A1..36_F6 in row-major order
-        var oneBased = row * n + item + 1
-        var idx2 = (oneBased < 10 ? "0" : "") + oneBased
-        return idx2 + "_" + rowLetter + colNumber + ".png"
+    height: Math.max(iconPx, Theme.itemSizeSmall)
+    width: parent ? parent.width : Screen.width
+
+    function rowLetter(r) {
+        return String.fromCharCode("A".charCodeAt(0) + r)
+    }
+
+    function posLabel(r, c) {
+        return rowLetter(r) + (c + 1)
+    }
+
+    function iconOneBasedIndex(r, item) {
+        // icon set is row-major: (row * n + item) + 1
+        return (r * n + item + 1)
+    }
+
+    function iconSourceForClue(c) {
+        if (!c || c.row === undefined || c.item === undefined)
+            return ""
+
+        var r = Number(c.row)
+        var it = Number(c.item)
+
+        if (isNaN(r) || isNaN(it) || r < 0 || it < 0 || r >= n || it >= n)
+            return ""
+
+        var idx = iconOneBasedIndex(r, it)
+        return "image://sherlock/" + iconPx + "/" + idx + "?e=" + epoch
     }
 
     Row {
-        anchors.verticalCenter: parent.verticalCenter
-        x: Theme.horizontalPageMargin
+        anchors.fill: parent
+        anchors.leftMargin: Theme.horizontalPageMargin
+        anchors.rightMargin: Theme.horizontalPageMargin
         spacing: Theme.paddingMedium
 
-        // Left: icon
         Image {
-            width: Theme.iconSizeMedium
-            height: Theme.iconSizeMedium
+            width: iconPx
+            height: iconPx
             fillMode: Image.PreserveAspectFit
             smooth: false
-
-            source: (sherlockEngine.iconSource === 0)
-                ? Qt.resolvedUrl("../assets/generated_icons/icons_32x32/" + genFileName(clue.row, clue.item))
-                : ("image://sherlock/32/" + (clue.row * n + clue.item + 1) + "?e=" + sherlockEngine.iconEpoch)
+            asynchronous: true
+            cache: true
+            source: iconSourceForClue(root.clue)
         }
 
-        // Middle: operator (for now “=” to mean “given here”)
         Label {
-            text: "\u2192"   // arrow for “given at”
+            // simple arrow; swap to an Icon later if you want
+            text: "\u2192"
+            verticalAlignment: Text.AlignVCenter
+            height: parent.height
             color: Theme.secondaryColor
-            font.pixelSize: Theme.fontSizeLarge
-            verticalAlignment: Text.AlignVCenter
         }
 
-        // Right: target location (e.g. “A3”)
         Label {
-            text: String.fromCharCode("A".charCodeAt(0) + clue.row) + (clue.col + 1)
-            color: Theme.primaryColor
-            font.pixelSize: Theme.fontSizeLarge
             verticalAlignment: Text.AlignVCenter
-        }
-    }
+            height: parent.height
+            color: Theme.primaryColor
 
-    onClicked: {
-        // later: hide/disable clue, or show explanation
+            text: {
+                if (!root.clue || root.clue.row === undefined || root.clue.col === undefined)
+                    return ""
+
+                var r = Number(root.clue.row)
+                var c = Number(root.clue.col)
+                if (isNaN(r) || isNaN(c) || r < 0 || c < 0 || r >= n || c >= n)
+                    return ""
+
+                // “A1-style position”
+                return posLabel(r, c)
+            }
+        }
     }
 }
