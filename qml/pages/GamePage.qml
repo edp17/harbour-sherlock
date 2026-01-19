@@ -90,81 +90,72 @@ Page
                       " deduction board. Tap toggles a candidate. Long-press sets a certain candidate.\nImported images: " +
                       (sherlockEngine.hasImportedImages ? "yes" : "no (placeholders)")
             }
+
             // --- Docked clue panels (DOS-like layout) ---
-            Item {
-                id: dockedArea
-                width: parent.width
+// Board
+Components.SherlockBoard {
+    id: board
+    width: parent.width
+}
 
-                // tweakable sizing
-                readonly property real gap: Theme.paddingLarge
-                readonly property real sideW: Math.min(Theme.itemSizeLarge * 2.2, Math.floor(width * 0.38))
+// Clues under the board (DOS-like: vertical on top, horizontal below)
+SectionHeader { text: "Clues" }
 
-                Column {
-                    width: parent.width
-                    spacing: Theme.paddingMedium
+Column {
+    width: parent.width
+    spacing: Theme.paddingSmall
 
-                    // Board + right-side clues
-                    Row {
-                        id: topRow
-                        width: parent.width
-                        spacing: dockedArea.gap
+    // Top: vertical clues (future)
+    Flickable {
+        id: verticalClues
+        width: parent.width
+        height: Theme.itemSizeSmall * 1.2
+        clip: true
+        contentWidth: vRow.width
+        contentHeight: vRow.height
 
-                        Components.SherlockBoard {
-                            id: board
-                            width: Math.max(Theme.itemSizeLarge * 4, topRow.width - dockedArea.sideW - topRow.spacing)
-                        }
-
-                        // Right panel: vertical clue list
-                        SilicaListView {
-                            id: rightClues
-                            width: dockedArea.sideW
-                            height: board.height
-                            clip: true
-                            spacing: Theme.paddingSmall
-
-                            model: sherlockEngine.clues
-
-                            header: Label {
-                                x: Theme.paddingSmall
-                                width: parent.width - 2*Theme.paddingSmall
-                                text: "Clues"
-                                color: Theme.secondaryColor
-                                font.pixelSize: Theme.fontSizeSmall
-                            }
-
-                            delegate: Components.ClueStrip {
-                                width: rightClues.width
-                                clue: modelData
-                            }
-                        }
-                    }
-
-                    // Bottom panel: horizontal clue list (scroll)
-                    Flickable {
-                        id: bottomClues
-                        width: parent.width
-                        height: Theme.itemSizeSmall * 1.2
-                        clip: true
-
-                        contentWidth: bottomRow.width
-                        contentHeight: bottomRow.height
-
-                        Row {
-                            id: bottomRow
-                            spacing: Theme.paddingSmall
-
-                            Repeater {
-                                model: sherlockEngine.clues
-                                delegate: Components.ClueStrip {
-                                    width: Theme.itemSizeLarge * 2.2
-                                    height: bottomClues.height
-                                    clue: modelData
-                                }
-                            }
-                        }
-                    }
+        Row {
+            id: vRow
+            spacing: Theme.paddingSmall
+            Repeater {
+                model: sherlockEngine.clues
+                delegate: Components.ClueStrip {
+                    clue: modelData
+                    // later: visible: modelData.type === 1
+                    visible: false   // no vertical clues yet
+                    height: verticalClues.height
+                    width: Theme.itemSizeLarge * 2.2
                 }
-            }// --- end docked clue panels ---
+            }
+        }
+    }
+
+    // Bottom: horizontal clues (current "Given" goes here)
+    Flickable {
+        id: horizontalClues
+        width: parent.width
+        height: Theme.itemSizeSmall * 1.2
+        clip: true
+        contentWidth: hRow.width
+        contentHeight: hRow.height
+
+        Row {
+            id: hRow
+            spacing: Theme.paddingSmall
+            Repeater {
+                model: sherlockEngine.clues
+                delegate: Components.ClueStrip {
+                    clue: modelData
+                    // later: visible: modelData.type !== 1
+                    visible: true
+                    height: horizontalClues.height
+                    width: Theme.itemSizeLarge * 2.2
+                }
+            }
+        }
+    }
+}
+            // --- end docked clue panels ---
         }
     }
 

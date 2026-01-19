@@ -14,6 +14,10 @@ Item {
     height: Math.max(iconPx, Theme.itemSizeSmall)
     width: parent ? parent.width : Screen.width
 
+    // Display size (theme), but provider must be 16/32
+    readonly property int iconDisplayPx: Theme.iconSizeMedium
+    readonly property int iconProviderPx: (iconDisplayPx <= 20 ? 16 : 32)
+
     function rowLetter(r) {
         return String.fromCharCode("A".charCodeAt(0) + r)
     }
@@ -27,18 +31,14 @@ Item {
         return (r * n + item + 1)
     }
 
-    function iconSourceForClue(c) {
-        if (!c || c.row === undefined || c.item === undefined)
-            return ""
+    function iconSourceForClue() {
+        if (!clue) return ""
 
-        var r = Number(c.row)
-        var it = Number(c.item)
+        // clue.row and clue.item are 0-based, match engine mapping:
+        // shiIndex = 1 + row*n + item
+        var idx = 1 + (clue.row * n) + clue.item
 
-        if (isNaN(r) || isNaN(it) || r < 0 || it < 0 || r >= n || it >= n)
-            return ""
-
-        var idx = iconOneBasedIndex(r, it)
-        return "image://sherlock/" + iconPx + "/" + idx + "?e=" + epoch
+        return "image://sherlock/" + iconProviderPx + "/" + idx + "?e=" + sherlockEngine.iconEpoch
     }
 
     Row {
@@ -48,13 +48,12 @@ Item {
         spacing: Theme.paddingMedium
 
         Image {
-            width: iconPx
-            height: iconPx
+            id: icon
+            width: iconDisplayPx
+            height: iconDisplayPx
             fillMode: Image.PreserveAspectFit
             smooth: false
-            asynchronous: true
-            cache: true
-            source: iconSourceForClue(root.clue)
+            source: iconSourceForClue()
         }
 
         Label {
