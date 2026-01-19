@@ -34,11 +34,15 @@ Item {
     function iconSourceForClue() {
         if (!clue) return ""
 
-        // clue.row and clue.item are 0-based, match engine mapping:
-        // shiIndex = 1 + row*n + item
-        var idx = 1 + (clue.row * n) + clue.item
+        var r = Number(clue.row)
+        var it = Number(clue.item)
+        if (isNaN(r) || isNaN(it)) return ""
 
-        return "image://sherlock/" + iconProviderPx + "/" + idx + "?e=" + sherlockEngine.iconEpoch
+        // Use the explicit row/item form (provider parses this reliably)
+        return "image://sherlock/"
+                + iconProviderPx
+                + "/r" + r + "_i" + it
+                + "?e=" + sherlockEngine.iconEpoch
     }
 
     Row {
