@@ -7,6 +7,7 @@ Item {
     // Expected clue shape: { type:int, row:int, col:int, item:int }
     property var clue: ({})
     property bool use16px: false
+    property int orient: 1   // 0=Vertical, 1=Horizontal
 
     property bool showArrow: true
     property bool showPosition: true
@@ -97,6 +98,8 @@ Item {
             text: "\u2192" // →
             font.pixelSize: Theme.fontSizeLarge
             color: Theme.primaryColor
+            rotation: (orient === 0) ? 90 : 0
+            transformOrigin: Item.Center
         }
 
         // Position tile (A1)

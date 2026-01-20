@@ -22,6 +22,7 @@ class SherlockEngine : public QObject
     Q_PROPERTY(int iconEpoch READ iconEpoch NOTIFY imagesChanged)
     int iconEpoch() const { return m_iconEpoch; }
     Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
+    Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
 
 public:
     enum IconSource {
@@ -39,6 +40,7 @@ public:
 
     QVariantList boardMasks() const;
     QVariantList clues() const;
+    QVariantList clueGroups() const;
     bool hasImportedImages() const { return m_hasImages; }
 
     QString dataDir() const;
@@ -71,12 +73,13 @@ public:
     Q_ENUM(ClueOrient)
 
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY cluesChanged)
-    QVariantList clueGroups() const;
+    
 
 signals:
     void sizeChanged();
     void boardChanged();
     void cluesChanged();
+    void clueGroupsChanged();
     void imagesChanged();
     void message(const QString &text);
     void iconSourceChanged();

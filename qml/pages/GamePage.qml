@@ -100,85 +100,102 @@ Page
 
             // Clues under the board (DOS-like: vertical on top, horizontal below)
             SectionHeader { text: "Clues" }
+// --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
+Item {
+    id: cluePanel
+    width: parent.width
 
-            Column {
-                id: cluePanel
-                width: parent.width
-                spacing: Theme.paddingSmall
+    readonly property int n: sherlockEngine.size
+    readonly property real gap: Theme.paddingSmall
+    readonly property real margin: Theme.horizontalPageMargin
 
-                // Strip sizing
-                readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.25)
-                readonly property int clueStripW: Math.floor(Theme.itemSizeLarge * 2.4)
+    // size each strip so n columns fit
+    readonly property real stripW: Math.floor((width - 2*margin - (n-1)*gap) / n)
+    readonly property real stripH: Theme.itemSizeSmall
 
-                // Filter helpers (QtQuick 2.6-safe)
-                function cluesOfType(t) {
-                    var out = []
-                    var cs = sherlockEngine.clues
-                    if (!cs) return out
-                    for (var i = 0; i < cs.length; ++i) {
-                        var c = cs[i]
-                        if (c && Number(c.type) === t)
-                            out.push(c)
-                    }
-                    return out
-                }
+    property var vGroups: []
+    property var hGroups: []
 
-                // Re-evaluates automatically when sherlockEngine.clues changes
-                readonly property var vClues: cluesOfType(1)   // vertical (later)
-                readonly property var hClues: cluesOfType(0)   // horizontal (current givens)
+    function updateGroups() {
+        var gs = sherlockEngine.clueGroups
+        var v = []
+        var h = []
+        if (gs && gs.length) {
+            for (var i = 0; i < gs.length; ++i) {
+                var g = gs[i]
+                if (g.orient === 0) v.push(g)
+                else if (g.orient === 1) h.push(g)
+            }
+        }
+        vGroups = v
+        hGroups = h
+    }
 
-                // Top: vertical clues (only takes space if present)
-                Flickable {
-                    id: verticalClues
-                    width: parent.width
-                    height: (cluePanel.vClues.length > 0) ? cluePanel.clueStripH : 0
-                    visible: cluePanel.vClues.length > 0
-                    clip: true
-                    contentWidth: vRow.width
-                    contentHeight: vRow.height
+    Component.onCompleted: updateGroups()
 
-                    Row {
-                        id: vRow
-                        spacing: Theme.paddingSmall
+    Connections {
+        target: sherlockEngine
+        onClueGroupsChanged: cluePanel.updateGroups()
+    }
 
-                        Repeater {
-                            model: cluePanel.vClues
-                            delegate: Components.ClueStrip {
-                                clue: modelData
-                                height: cluePanel.clueStripH
-                                width: cluePanel.clueStripW
-                                // (later we can add a "direction: down" API here)
-                            }
-                        }
-                    }
-                }
+    Column {
+        x: margin
+        width: parent.width - 2*margin
+        spacing: Theme.paddingMedium
 
-                // Bottom: horizontal clues
-                Flickable {
-                    id: horizontalClues
-                    width: parent.width
-                    height: (cluePanel.hClues.length > 0) ? cluePanel.clueStripH : 0
-                    visible: cluePanel.hClues.length > 0
-                    clip: true
-                    contentWidth: hRow.width
-                    contentHeight: hRow.height
+        // ---- Vertical clues (top): grid with n columns, each column is a stack
+        Grid {
+            id: vGrid
+            columns: cluePanel.n
+            spacing: cluePanel.gap
 
-                    Row {
-                        id: hRow
-                        spacing: Theme.paddingSmall
+            Repeater {
+                model: cluePanel.vGroups
 
-                        Repeater {
-                            model: cluePanel.hClues
-                            delegate: Components.ClueStrip {
-                                clue: modelData
-                                height: cluePanel.clueStripH
-                                width: cluePanel.clueStripW
-                            }
+                Column {
+                    spacing: cluePanel.gap
+                    readonly property var g: modelData
+
+                    Repeater {
+                        model: g.clues
+
+                        Components.ClueStrip {
+                            width: cluePanel.stripW
+                            height: cluePanel.stripH
+                            clue: modelData
                         }
                     }
                 }
             }
-            // --- end docked clue panels ---
+        }
+
+        // ---- Horizontal clues (bottom): n rows, each row has 1..K strips
+        Column {
+            id: hCol
+            spacing: cluePanel.gap
+
+            Repeater {
+                model: cluePanel.hGroups
+
+                Row {
+                    spacing: cluePanel.gap
+                    readonly property var g: modelData
+
+                    Repeater {
+                        model: g.clues
+
+                        Components.ClueStrip {
+                            width: cluePanel.stripW
+                            height: cluePanel.stripH
+                            clue: modelData
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+// --- end clues panel ---
         }
     }
 

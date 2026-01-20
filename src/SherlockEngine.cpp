@@ -218,14 +218,14 @@ QVariantList SherlockEngine::clues() const
 void SherlockEngine::rebuildClues()
 {
     m_clues.clear();
+    m_clueGroups.clear();
 
     const int n = m_size;
     const int cells = n * n;
 
-    // Safety: if solution not present, only show "givens" from fixed cells (if any).
     const bool haveSolution = (m_solution.size() == cells);
 
-    auto addClue = [&](int type, int r, int c, int item) {
+    auto addFlat = [&](int type, int r, int c, int item) {
         Clue cl;
         cl.type = type;   // 0=Given, 1=Vertical, 2=Horizontal
         cl.row  = r;
@@ -235,75 +235,101 @@ void SherlockEngine::rebuildClues()
     };
 
     auto itemFromCertainMask = [&](quint32 m) -> int {
-        // m expected to be exactly one bit.
-        for (int i = 0; i < n; ++i) {
-            if (m == bit(i))
-                return i;
-        }
+        for (int i = 0; i < n; ++i)
+            if (m == bit(i)) return i;
         return -1;
     };
 
-    // ------------------------------------------------------------------
-    // 0) Given clues: every fixed cell becomes a clue stripe.
-    // ------------------------------------------------------------------
+    // ------------------------------------------------------------
+    // 0) Flat "Given" clues (optional; you can keep or drop later)
+    // ------------------------------------------------------------
     for (int r = 0; r < n; ++r) {
         for (int c = 0; c < n; ++c) {
             const int i = idx(r, c);
-            if (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]) {
-                int item = -1;
-                if (haveSolution) {
-                    item = m_solution[i];
-                } else {
-                    item = itemFromCertainMask(m_masks[i]);
-                }
-                if (item >= 0 && item < n)
-                    addClue(/*Given*/0, r, c, item);
-            }
+            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
+            if (!isFixed) continue;
+
+            int item = -1;
+            if (haveSolution) item = m_solution[i];
+            else              item = itemFromCertainMask(m_masks[i]);
+
+            if (item >= 0 && item < n)
+                addFlat(/*Given*/0, r, c, item);
         }
     }
 
+    // If we have no solution, we cannot build meaningful vertical/horizontal groups.
     if (!haveSolution) {
         emit cluesChanged();
+        emit clueGroupsChanged();
         return;
     }
 
-    // ------------------------------------------------------------------
-    // 1) Vertical clues (type=1): for each column, take the first K
-    //    non-fixed positions and add them as vertical clues.
-    // ------------------------------------------------------------------
-    const int K = (n >= 6) ? 2 : (n == 5 ? 2 : 1); // 6->2, 5->2, 4->1 (tweak later)
+    // How many strips per row/col (matches your earlier “2–3 later” plan)
+    const int K = (n >= 6) ? 2 : (n == 5 ? 2 : 1);
 
+    // Collect grouped clues:
+    QVector<QVector<Clue>> vByCol(n);
+    QVector<QVector<Clue>> hByRow(n);
+
+    auto addToGroup = [&](QVector<Clue> &vec, int type, int r, int c, int item) {
+        Clue cl;
+        cl.type = type;
+        cl.row  = r;
+        cl.col  = c;
+        cl.item = item;
+        vec.push_back(cl);
+        addFlat(type, r, c, item); // keep flat list in sync
+    };
+
+    // ------------------------------------------------------------
+    // 1) Vertical groups (orient=0): one group per column
+    // ------------------------------------------------------------
     for (int c = 0; c < n; ++c) {
         int added = 0;
         for (int r = 0; r < n && added < K; ++r) {
             const int i = idx(r, c);
             const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
-            if (isFixed)
-                continue;
+            if (isFixed) continue;
 
-            addClue(/*Vertical*/1, r, c, m_solution[i]);
+            addToGroup(vByCol[c], /*Vertical*/1, r, c, m_solution[i]);
             ++added;
         }
     }
 
-    // ------------------------------------------------------------------
-    // 2) Horizontal clues (type=2): for each row, take the first K
-    //    non-fixed positions and add them as horizontal clues.
-    // ------------------------------------------------------------------
+    // ------------------------------------------------------------
+    // 2) Horizontal groups (orient=1): one group per row
+    // ------------------------------------------------------------
     for (int r = 0; r < n; ++r) {
         int added = 0;
         for (int c = 0; c < n && added < K; ++c) {
             const int i = idx(r, c);
             const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
-            if (isFixed)
-                continue;
+            if (isFixed) continue;
 
-            addClue(/*Horizontal*/2, r, c, m_solution[i]);
+            addToGroup(hByRow[r], /*Horizontal*/2, r, c, m_solution[i]);
             ++added;
         }
     }
 
+    // ------------------------------------------------------------
+    // Export groups to QML: all vertical groups first, then horizontal
+    // ------------------------------------------------------------
+    for (int c = 0; c < n; ++c) {
+        ClueGroup g;
+        g.orient = 0;          // 0 = vertical
+        g.clues  = vByCol[c];
+        m_clueGroups.push_back(g);
+    }
+    for (int r = 0; r < n; ++r) {
+        ClueGroup g;
+        g.orient = 1;          // 1 = horizontal
+        g.clues  = hByRow[r];
+        m_clueGroups.push_back(g);
+    }
+
     emit cluesChanged();
+    emit clueGroupsChanged();
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const
