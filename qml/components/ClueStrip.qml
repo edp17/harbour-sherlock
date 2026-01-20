@@ -4,86 +4,120 @@ import Sailfish.Silica 1.0
 Item {
     id: root
 
-    // Expecting engine clue maps: { type, row, col, item }
-    // type: currently 0 = Given
+    // Expected clue shape: { type:int, row:int, col:int, item:int }
     property var clue: ({})
-    property int n: sherlockEngine.size
-    property int iconPx: Theme.iconSizeMedium
-    property int epoch: sherlockEngine.iconEpoch
+    property bool use16px: false
 
-    height: Math.max(iconPx, Theme.itemSizeSmall)
-    width: parent ? parent.width : Screen.width
+    property bool showArrow: true
+    property bool showPosition: true
 
-    // Display size (theme), but provider must be 16/32
-    readonly property int iconDisplayPx: Theme.iconSizeMedium
-    readonly property int iconProviderPx: (iconDisplayPx <= 20 ? 16 : 32)
+    readonly property int n: sherlockEngine.size
 
-    function rowLetter(r) {
-        return String.fromCharCode("A".charCodeAt(0) + r)
+    readonly property int posRow: Number(clue && clue.row !== undefined ? clue.row : 0)
+    readonly property int posCol: Number(clue && clue.col !== undefined ? clue.col : 0)
+
+    readonly property int iconRow: Number(clue && clue.row !== undefined ? clue.row : 0)
+    readonly property int iconItem: Number(clue && clue.item !== undefined ? clue.item : 0)
+
+    readonly property int iconOneBasedIndex: (iconRow * n + iconItem + 1)
+
+    readonly property string posText: {
+        var rowLetter = String.fromCharCode("A".charCodeAt(0) + posRow)
+        return rowLetter + (posCol + 1)
     }
 
-    function posLabel(r, c) {
-        return rowLetter(r) + (c + 1)
+    readonly property int iconDisplayPx: Math.max(Theme.iconSizeSmall, 32)
+    readonly property int tilePx: Math.max(Theme.iconSizeSmall, 32)
+
+    implicitHeight: Math.max(iconDisplayPx, tilePx) + Theme.paddingSmall * 2
+    implicitWidth: row.implicitWidth
+
+    function genFileName(row, item) {
+        var idx = row * n + item + 1
+        var idx2 = (idx < 10 ? "0" : "") + idx
+        var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
+        var colNumber = item + 1
+        return idx2 + "_" + rowLetter + colNumber + ".png"
     }
 
-    function iconOneBasedIndex(r, item) {
-        // icon set is row-major: (row * n + item) + 1
-        return (r * n + item + 1)
-    }
+    readonly property string genIconPath:
+        "../assets/generated_icons/" + (use16px ? "icons_16x16/" : "icons_32x32/")
+        + genFileName(iconRow, iconItem)
+        + "?e=" + sherlockEngine.iconEpoch
 
-    function iconSourceForClue() {
-        if (!clue) return ""
+    readonly property string shiIconPath:
+        ("image://sherlock/" + (use16px ? "16" : "32") + "/" + iconOneBasedIndex
+         + "?e=" + sherlockEngine.iconEpoch)
 
-        var r = Number(clue.row)
-        var it = Number(clue.item)
-        if (isNaN(r) || isNaN(it)) return ""
-
-        // Use the explicit row/item form (provider parses this reliably)
-        return "image://sherlock/"
-                + iconProviderPx
-                + "/r" + r + "_i" + it
-                + "?e=" + sherlockEngine.iconEpoch
+    Rectangle {
+        anchors.fill: parent
+        radius: Theme.paddingSmall
+        color: Theme.rgba(Theme.primaryColor, 0.06)
+        border.width: 1
+        border.color: Theme.rgba(Theme.primaryColor, 0.12)
     }
 
     Row {
+        id: row
         anchors.fill: parent
-        anchors.leftMargin: Theme.horizontalPageMargin
-        anchors.rightMargin: Theme.horizontalPageMargin
-        spacing: Theme.paddingMedium
+        anchors.margins: Theme.paddingSmall
+        spacing: Theme.paddingSmall
 
-        Image {
-            id: icon
-            width: iconDisplayPx
-            height: iconDisplayPx
-            fillMode: Image.PreserveAspectFit
-            smooth: false
-            source: iconSourceForClue()
+        // Icon tile
+        Rectangle {
+            id: iconTile
+            width: iconDisplayPx + Theme.paddingSmall * 2
+            height: iconDisplayPx + Theme.paddingSmall * 2
+            radius: Theme.paddingSmall / 2
+            color: Theme.rgba(Theme.primaryColor, 0.02)
+            border.width: 1
+            border.color: Theme.rgba(Theme.primaryColor, 0.25)
+
+            anchors.verticalCenter: parent.verticalCenter
+
+            Image {
+                anchors.centerIn: parent
+                width: iconDisplayPx
+                height: iconDisplayPx
+                smooth: false
+                cache: true
+                asynchronous: true
+                fillMode: Image.PreserveAspectFit
+
+                source: (sherlockEngine.iconSource === 0)
+                        ? Qt.resolvedUrl(genIconPath)
+                        : shiIconPath
+            }
         }
 
+        // Arrow
         Label {
-            // simple arrow; swap to an Icon later if you want
-            text: "\u2192"
-            verticalAlignment: Text.AlignVCenter
-            height: parent.height
-            color: Theme.secondaryColor
-        }
-
-        Label {
-            verticalAlignment: Text.AlignVCenter
-            height: parent.height
+            visible: showArrow
+            anchors.verticalCenter: parent.verticalCenter
+            text: "\u2192" // →
+            font.pixelSize: Theme.fontSizeLarge
             color: Theme.primaryColor
+        }
 
-            text: {
-                if (!root.clue || root.clue.row === undefined || root.clue.col === undefined)
-                    return ""
+        // Position tile (A1)
+        Rectangle {
+            id: posTile
+            visible: showPosition
+            width: tilePx + Theme.paddingSmall * 2
+            height: tilePx + Theme.paddingSmall * 2
+            radius: Theme.paddingSmall / 2
+            color: Theme.rgba(Theme.primaryColor, 0.02)
+            border.width: 1
+            border.color: Theme.rgba(Theme.primaryColor, 0.25)
 
-                var r = Number(root.clue.row)
-                var c = Number(root.clue.col)
-                if (isNaN(r) || isNaN(c) || r < 0 || c < 0 || r >= n || c >= n)
-                    return ""
+            anchors.verticalCenter: parent.verticalCenter
 
-                // “A1-style position”
-                return posLabel(r, c)
+            Label {
+                anchors.centerIn: parent
+                text: posText
+                color: Theme.primaryColor
+                font.pixelSize: Theme.fontSizeSmall
+                font.bold: true
             }
         }
     }

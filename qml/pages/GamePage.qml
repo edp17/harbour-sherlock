@@ -34,14 +34,14 @@ Page
                 onClicked: sherlockEngine.resetMarks()
             }
             MenuItem {
-                text: "Use Generated Icons"
-//                onClicked: sherlockEngine.iconSource = 0   // Generated
-                onClicked: sherlockEngine.iconSource = sherlockEngine.Generated
-            }
-            MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
             }
+//            MenuItem {
+//                text: "Use Generated Icons"
+//                onClicked: sherlockEngine.iconSource = 0   // Generated
+//                onClicked: sherlockEngine.iconSource = sherlockEngine.Generated
+//            }
 //            MenuItem {
 //                text: "Import sherlock.shi"
 //                onClicked: {
@@ -92,69 +92,76 @@ Page
             }
 
             // --- Docked clue panels (DOS-like layout) ---
-// Board
-Components.SherlockBoard {
-    id: board
-    width: parent.width
-}
+            // Board
+            Components.SherlockBoard {
+                id: board
+                width: parent.width
+            }
 
-// Clues under the board (DOS-like: vertical on top, horizontal below)
-SectionHeader { text: "Clues" }
+            // Clues under the board (DOS-like: vertical on top, horizontal below)
+            SectionHeader { text: "Clues" }
 
-Column {
-    width: parent.width
-    spacing: Theme.paddingSmall
+            Column {
+                id: cluePanel
+                width: parent.width
+                spacing: Theme.paddingSmall
 
-    // Top: vertical clues (future)
-    Flickable {
-        id: verticalClues
-        width: parent.width
-        height: Theme.itemSizeSmall * 1.2
-        clip: true
-        contentWidth: vRow.width
-        contentHeight: vRow.height
+                // Make the strip tall enough so ClueStrip can show the icon tile + arrow + position tile.
+                readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.25)
+                readonly property int clueStripW: Math.floor(Theme.itemSizeLarge * 2.4)
 
-        Row {
-            id: vRow
-            spacing: Theme.paddingSmall
-            Repeater {
-                model: sherlockEngine.clues
-                delegate: Components.ClueStrip {
-                    clue: modelData
-                    // later: visible: modelData.type === 1
-                    visible: false   // no vertical clues yet
-                    height: verticalClues.height
-                    width: Theme.itemSizeLarge * 2.2
+                // Top: vertical clues (reserved for later)
+                Flickable {
+                    id: verticalClues
+                    width: parent.width
+                    height: cluePanel.clueStripH
+                    clip: true
+
+                    contentWidth: vRow.width
+                    contentHeight: vRow.height
+
+                    Row {
+                        id: vRow
+                        spacing: Theme.paddingSmall
+
+                        Repeater {
+                            model: sherlockEngine.clues
+                            delegate: Components.ClueStrip {
+                                clue: modelData
+                                visible: false
+                                height: cluePanel.clueStripH
+                                width: cluePanel.clueStripW
+                            }
+                        }
+                    }
+                }
+
+                // Bottom: horizontal clues (your current "Given" clues)
+                Flickable {
+                    id: horizontalClues
+                    width: parent.width
+                    height: cluePanel.clueStripH
+                    clip: true
+
+                    contentWidth: hRow.width
+                    contentHeight: hRow.height
+
+                    Row {
+                        id: hRow
+                        spacing: Theme.paddingSmall
+
+                        Repeater {
+                            model: sherlockEngine.clues
+                            delegate: Components.ClueStrip {
+                                clue: modelData
+                                visible: true
+                                height: cluePanel.clueStripH
+                                width: cluePanel.clueStripW
+                            }
+                        }
+                    }
                 }
             }
-        }
-    }
-
-    // Bottom: horizontal clues (current "Given" goes here)
-    Flickable {
-        id: horizontalClues
-        width: parent.width
-        height: Theme.itemSizeSmall * 1.2
-        clip: true
-        contentWidth: hRow.width
-        contentHeight: hRow.height
-
-        Row {
-            id: hRow
-            spacing: Theme.paddingSmall
-            Repeater {
-                model: sherlockEngine.clues
-                delegate: Components.ClueStrip {
-                    clue: modelData
-                    // later: visible: modelData.type !== 1
-                    visible: true
-                    height: horizontalClues.height
-                    width: Theme.itemSizeLarge * 2.2
-                }
-            }
-        }
-    }
-}
             // --- end docked clue panels ---
         }
     }
