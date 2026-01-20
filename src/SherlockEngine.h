@@ -67,6 +67,12 @@ public:
     IconSource iconSource() const { return m_iconSource; }
     void setIconSource(int v);
 
+    enum ClueOrient { Vertical = 0, Horizontal = 1 };
+    Q_ENUM(ClueOrient)
+
+    Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY cluesChanged)
+    QVariantList clueGroups() const;
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -116,10 +122,16 @@ private:
     QString settingsPathHint() const;
 
     struct Clue {
-        int type;      // 0=Given (for now)
-        int row;       // 0..n-1
-        int col;       // 0..n-1
-        int item;      // 0..n-1 (solution value)
+        int type = 0; // keep your meaning (0=Given for now)
+        int row = 0;
+        int col = 0;
+        int item = 0;
     };
     QVector<Clue> m_clues;
+    struct ClueGroup {
+        int orient = Vertical;     // 0=Vertical, 1=Horizontal
+        QVector<Clue> clues;       // 2..3 entries ideally
+    };
+
+    QVector<ClueGroup> m_clueGroups;
 };

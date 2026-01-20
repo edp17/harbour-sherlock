@@ -31,6 +31,31 @@ SherlockEngine::SherlockEngine(QObject *parent)
     rebuildClues();
 }
 
+QVariantList SherlockEngine::clueGroups() const
+{
+    QVariantList out;
+    out.reserve(m_clueGroups.size());
+
+    for (const auto &g : m_clueGroups) {
+        QVariantMap gm;
+        gm["orient"] = g.orient;
+
+        QVariantList list;
+        list.reserve(g.clues.size());
+        for (const auto &c : g.clues) {
+            QVariantMap m;
+            m["type"] = c.type;
+            m["row"]  = c.row;
+            m["col"]  = c.col;
+            m["item"] = c.item;
+            list.push_back(m);
+        }
+        gm["clues"] = list;
+        out.push_back(gm);
+    }
+    return out;
+}
+
 int SherlockEngine::defaultGivenCount() const
 {
     // Feel free to tweak. These give a playable start without making it trivial.
@@ -197,26 +222,85 @@ void SherlockEngine::rebuildClues()
     const int n = m_size;
     const int cells = n * n;
 
-    for (int i = 0; i < cells; ++i) {
-        if (!m_fixed[i]) continue;
+    // Safety: if solution not present, only show "givens" from fixed cells (if any).
+    const bool haveSolution = (m_solution.size() == cells);
 
-        const int r = i / n;
-        const int c = i % n;
-
-        // fixed mask -> item
-        int item = -1;
-        const quint32 mask = m_masks[i];
-        for (int k = 0; k < n; ++k) {
-            if (mask == (1u << k)) { item = k; break; }
-        }
-        if (item < 0) continue;
-
+    auto addClue = [&](int type, int r, int c, int item) {
         Clue cl;
-        cl.type = 0; // Given
+        cl.type = type;   // 0=Given, 1=Vertical, 2=Horizontal
         cl.row  = r;
         cl.col  = c;
         cl.item = item;
         m_clues.push_back(cl);
+    };
+
+    auto itemFromCertainMask = [&](quint32 m) -> int {
+        // m expected to be exactly one bit.
+        for (int i = 0; i < n; ++i) {
+            if (m == bit(i))
+                return i;
+        }
+        return -1;
+    };
+
+    // ------------------------------------------------------------------
+    // 0) Given clues: every fixed cell becomes a clue stripe.
+    // ------------------------------------------------------------------
+    for (int r = 0; r < n; ++r) {
+        for (int c = 0; c < n; ++c) {
+            const int i = idx(r, c);
+            if (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]) {
+                int item = -1;
+                if (haveSolution) {
+                    item = m_solution[i];
+                } else {
+                    item = itemFromCertainMask(m_masks[i]);
+                }
+                if (item >= 0 && item < n)
+                    addClue(/*Given*/0, r, c, item);
+            }
+        }
+    }
+
+    if (!haveSolution) {
+        emit cluesChanged();
+        return;
+    }
+
+    // ------------------------------------------------------------------
+    // 1) Vertical clues (type=1): for each column, take the first K
+    //    non-fixed positions and add them as vertical clues.
+    // ------------------------------------------------------------------
+    const int K = (n >= 6) ? 2 : (n == 5 ? 2 : 1); // 6->2, 5->2, 4->1 (tweak later)
+
+    for (int c = 0; c < n; ++c) {
+        int added = 0;
+        for (int r = 0; r < n && added < K; ++r) {
+            const int i = idx(r, c);
+            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
+            if (isFixed)
+                continue;
+
+            addClue(/*Vertical*/1, r, c, m_solution[i]);
+            ++added;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // 2) Horizontal clues (type=2): for each row, take the first K
+    //    non-fixed positions and add them as horizontal clues.
+    // ------------------------------------------------------------------
+    for (int r = 0; r < n; ++r) {
+        int added = 0;
+        for (int c = 0; c < n && added < K; ++c) {
+            const int i = idx(r, c);
+            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
+            if (isFixed)
+                continue;
+
+            addClue(/*Horizontal*/2, r, c, m_solution[i]);
+            ++added;
+        }
     }
 
     emit cluesChanged();

@@ -106,17 +106,34 @@ Page
                 width: parent.width
                 spacing: Theme.paddingSmall
 
-                // Make the strip tall enough so ClueStrip can show the icon tile + arrow + position tile.
+                // Strip sizing
                 readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.25)
                 readonly property int clueStripW: Math.floor(Theme.itemSizeLarge * 2.4)
 
-                // Top: vertical clues (reserved for later)
+                // Filter helpers (QtQuick 2.6-safe)
+                function cluesOfType(t) {
+                    var out = []
+                    var cs = sherlockEngine.clues
+                    if (!cs) return out
+                    for (var i = 0; i < cs.length; ++i) {
+                        var c = cs[i]
+                        if (c && Number(c.type) === t)
+                            out.push(c)
+                    }
+                    return out
+                }
+
+                // Re-evaluates automatically when sherlockEngine.clues changes
+                readonly property var vClues: cluesOfType(1)   // vertical (later)
+                readonly property var hClues: cluesOfType(0)   // horizontal (current givens)
+
+                // Top: vertical clues (only takes space if present)
                 Flickable {
                     id: verticalClues
                     width: parent.width
-                    height: cluePanel.clueStripH
+                    height: (cluePanel.vClues.length > 0) ? cluePanel.clueStripH : 0
+                    visible: cluePanel.vClues.length > 0
                     clip: true
-
                     contentWidth: vRow.width
                     contentHeight: vRow.height
 
@@ -125,24 +142,24 @@ Page
                         spacing: Theme.paddingSmall
 
                         Repeater {
-                            model: sherlockEngine.clues
+                            model: cluePanel.vClues
                             delegate: Components.ClueStrip {
                                 clue: modelData
-                                visible: false
                                 height: cluePanel.clueStripH
                                 width: cluePanel.clueStripW
+                                // (later we can add a "direction: down" API here)
                             }
                         }
                     }
                 }
 
-                // Bottom: horizontal clues (your current "Given" clues)
+                // Bottom: horizontal clues
                 Flickable {
                     id: horizontalClues
                     width: parent.width
-                    height: cluePanel.clueStripH
+                    height: (cluePanel.hClues.length > 0) ? cluePanel.clueStripH : 0
+                    visible: cluePanel.hClues.length > 0
                     clip: true
-
                     contentWidth: hRow.width
                     contentHeight: hRow.height
 
@@ -151,10 +168,9 @@ Page
                         spacing: Theme.paddingSmall
 
                         Repeater {
-                            model: sherlockEngine.clues
+                            model: cluePanel.hClues
                             delegate: Components.ClueStrip {
                                 clue: modelData
-                                visible: true
                                 height: cluePanel.clueStripH
                                 width: cluePanel.clueStripW
                             }
