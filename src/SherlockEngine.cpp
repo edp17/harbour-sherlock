@@ -165,7 +165,7 @@ void SherlockEngine::loadState()
         for (int i = 0; i < cellCount; ++i)
             m_fixed[i] = 0;
     }
-
+    rebuildClues();
     emit iconSourceChanged();
     ++m_iconEpoch;
     emit imagesChanged();
@@ -223,109 +223,50 @@ void SherlockEngine::rebuildClues()
     const int n = m_size;
     const int cells = n * n;
 
-    const bool haveSolution = (m_solution.size() == cells);
-
-    auto addFlat = [&](int type, int r, int c, int item) {
-        Clue cl;
-        cl.type = type;   // 0=Given, 1=Vertical, 2=Horizontal
-        cl.row  = r;
-        cl.col  = c;
-        cl.item = item;
-        m_clues.push_back(cl);
+    auto isSingleton = [](quint32 m) -> bool {
+        return m && ((m & (m - 1u)) == 0u);
     };
 
-    auto itemFromCertainMask = [&](quint32 m) -> int {
-        for (int i = 0; i < n; ++i)
-            if (m == bit(i)) return i;
-        return -1;
+    auto singletonIndex = [&](quint32 m) -> int {
+        // m is singleton; find which bit (0..n-1)
+        for (int k = 0; k < n; ++k) {
+            if (m == bit(k))
+                return k;
+        }
+        return 0;
     };
 
-    // ------------------------------------------------------------
-    // 0) Flat "Given" clues (optional; you can keep or drop later)
-    // ------------------------------------------------------------
+    const bool haveFixed = (m_fixed.size() == cells);
+
     for (int r = 0; r < n; ++r) {
         for (int c = 0; c < n; ++c) {
             const int i = idx(r, c);
-            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
-            if (!isFixed) continue;
+            if (i < 0 || i >= m_masks.size())
+                continue;
 
-            int item = -1;
-            if (haveSolution) item = m_solution[i];
-            else              item = itemFromCertainMask(m_masks[i]);
+            const quint32 m = (m_masks[i] & fullMask());
+            if (!isSingleton(m))
+                continue;
 
-            if (item >= 0 && item < n)
-                addFlat(/*Given*/0, r, c, item);
+            // If fixed array exists, only build “Given” clues from fixed cells.
+            // If fixed array is missing (older saves), fall back to treating any singleton as “given”.
+            if (haveFixed && !m_fixed[i])
+                continue;
+
+            Clue cl;
+            cl.type = 0;          // 0 = Given (your current convention)
+            cl.row  = r;
+            cl.col  = c;
+            cl.item = singletonIndex(m);
+
+            m_clues.push_back(cl);
+
+            ClueGroup g;
+            g.orient = Horizontal;   // render as horizontal strips for now
+            g.clues.clear();
+            g.clues.push_back(cl);
+            m_clueGroups.push_back(g);
         }
-    }
-
-    // If we have no solution, we cannot build meaningful vertical/horizontal groups.
-    if (!haveSolution) {
-        emit cluesChanged();
-        emit clueGroupsChanged();
-        return;
-    }
-
-    // How many strips per row/col (matches your earlier “2–3 later” plan)
-    const int K = (n >= 6) ? 2 : (n == 5 ? 2 : 1);
-
-    // Collect grouped clues:
-    QVector<QVector<Clue>> vByCol(n);
-    QVector<QVector<Clue>> hByRow(n);
-
-    auto addToGroup = [&](QVector<Clue> &vec, int type, int r, int c, int item) {
-        Clue cl;
-        cl.type = type;
-        cl.row  = r;
-        cl.col  = c;
-        cl.item = item;
-        vec.push_back(cl);
-        addFlat(type, r, c, item); // keep flat list in sync
-    };
-
-    // ------------------------------------------------------------
-    // 1) Vertical groups (orient=0): one group per column
-    // ------------------------------------------------------------
-    for (int c = 0; c < n; ++c) {
-        int added = 0;
-        for (int r = 0; r < n && added < K; ++r) {
-            const int i = idx(r, c);
-            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
-            if (isFixed) continue;
-
-            addToGroup(vByCol[c], /*Vertical*/1, r, c, m_solution[i]);
-            ++added;
-        }
-    }
-
-    // ------------------------------------------------------------
-    // 2) Horizontal groups (orient=1): one group per row
-    // ------------------------------------------------------------
-    for (int r = 0; r < n; ++r) {
-        int added = 0;
-        for (int c = 0; c < n && added < K; ++c) {
-            const int i = idx(r, c);
-            const bool isFixed = (!m_fixed.isEmpty() && i < m_fixed.size() && m_fixed[i]);
-            if (isFixed) continue;
-
-            addToGroup(hByRow[r], /*Horizontal*/2, r, c, m_solution[i]);
-            ++added;
-        }
-    }
-
-    // ------------------------------------------------------------
-    // Export groups to QML: all vertical groups first, then horizontal
-    // ------------------------------------------------------------
-    for (int c = 0; c < n; ++c) {
-        ClueGroup g;
-        g.orient = 0;          // 0 = vertical
-        g.clues  = vByCol[c];
-        m_clueGroups.push_back(g);
-    }
-    for (int r = 0; r < n; ++r) {
-        ClueGroup g;
-        g.orient = 1;          // 1 = horizontal
-        g.clues  = hByRow[r];
-        m_clueGroups.push_back(g);
     }
 
     emit cluesChanged();

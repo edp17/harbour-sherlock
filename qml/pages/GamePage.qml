@@ -101,17 +101,11 @@ Page
             // Clues under the board (DOS-like: vertical on top, horizontal below)
             SectionHeader { text: "Clues" }
 // --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
-Item {
+Column {
     id: cluePanel
     width: parent.width
-
-    readonly property int n: sherlockEngine.size
-    readonly property real gap: Theme.paddingSmall
-    readonly property real margin: Theme.horizontalPageMargin
-
-    // size each strip so n columns fit
-    readonly property real stripW: Math.floor((width - 2*margin - (n-1)*gap) / n)
-    readonly property real stripH: Theme.itemSizeSmall
+    spacing: Theme.paddingMedium
+    x: Theme.horizontalPageMargin
 
     property var vGroups: []
     property var hGroups: []
@@ -120,12 +114,11 @@ Item {
         var gs = sherlockEngine.clueGroups
         var v = []
         var h = []
-        if (gs && gs.length) {
-            for (var i = 0; i < gs.length; ++i) {
-                var g = gs[i]
-                if (g.orient === 0) v.push(g)
-                else if (g.orient === 1) h.push(g)
-            }
+        for (var i = 0; gs && i < gs.length; ++i) {
+            var g = gs[i]
+            if (!g) continue
+            if (g.orient === 0) v.push(g)   // 0 = Vertical
+            else h.push(g)                  // 1 = Horizontal
         }
         vGroups = v
         hGroups = h
@@ -138,58 +131,37 @@ Item {
         onClueGroupsChanged: cluePanel.updateGroups()
     }
 
-    Column {
-        x: cluePanel.margin
-        width: parent.width - 2*cluePanel.margin
-        spacing: Theme.paddingMedium
+    // Vertical clues area (empty for now, but space is now correct)
+    Row {
+        width: parent.width
+        spacing: Theme.paddingSmall
+        visible: cluePanel.vGroups.length > 0
 
-        // ---- Vertical clues (top): grid with n columns, each column is a stack
-        Grid {
-            id: vGrid
-            columns: cluePanel.n
-            spacing: cluePanel.gap
-
-            Repeater {
-                model: cluePanel.vGroups
-
-                Column {
-                    spacing: cluePanel.gap
-                    readonly property var g: modelData
-
-                    Repeater {
-                        model: g.clues
-
-                        Components.ClueStrip {
-                            width: cluePanel.stripW
-                            height: cluePanel.stripH
-                            clue: modelData
-                        }
-                    }
+        Repeater {
+            model: cluePanel.vGroups
+            Column {
+                spacing: Theme.paddingSmall
+                Repeater {
+                    model: modelData.clues
+                    Components.ClueStrip { clue: modelData }
                 }
             }
         }
+    }
 
-        // ---- Horizontal clues (bottom): n rows, each row has 1..K strips
-        Column {
-            id: hCol
-            spacing: cluePanel.gap
+    // Horizontal clues (your current “Given strips” live here)
+    Row {
+        width: parent.width
+        spacing: Theme.paddingSmall
+        visible: cluePanel.hGroups.length > 0
 
-            Repeater {
-                model: cluePanel.hGroups
-
-                Row {
-                    spacing: cluePanel.gap
-                    readonly property var g: modelData
-
-                    Repeater {
-                        model: g.clues
-
-                        Components.ClueStrip {
-                            width: cluePanel.stripW
-                            height: cluePanel.stripH
-                            clue: modelData
-                        }
-                    }
+        Repeater {
+            model: cluePanel.hGroups
+            Row {
+                spacing: Theme.paddingSmall
+                Repeater {
+                    model: modelData.clues
+                    Components.ClueStrip { clue: modelData }
                 }
             }
         }
