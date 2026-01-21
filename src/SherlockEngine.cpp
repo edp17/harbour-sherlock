@@ -217,59 +217,84 @@ QVariantList SherlockEngine::clues() const
 
 void SherlockEngine::rebuildClues()
 {
-    m_clues.clear();
     m_clueGroups.clear();
 
     const int n = m_size;
     const int cells = n * n;
 
-    auto isSingleton = [](quint32 m) -> bool {
-        return m && ((m & (m - 1u)) == 0u);
+    // 1) Collect "given" clues from fixed cells (certain masks)
+    QVector<Clue> givens;
+    givens.reserve(cells);
+
+    auto isCertainMask = [](quint32 m) -> bool {
+        return m != 0 && ((m & (m - 1)) == 0);
     };
 
-    auto singletonIndex = [&](quint32 m) -> int {
-        // m is singleton; find which bit (0..n-1)
-        for (int k = 0; k < n; ++k) {
-            if (m == bit(k))
-                return k;
+    auto bitIndex = [](quint32 m) -> int {
+        // m is power-of-two here
+        for (int i = 0; i < 32; ++i) {
+            if (m == (1u << i)) return i;
         }
-        return 0;
+        return -1;
     };
 
-    const bool haveFixed = (m_fixed.size() == cells);
+    for (int i = 0; i < cells; ++i) {
+        if (!m_fixed[i]) continue;
 
-    for (int r = 0; r < n; ++r) {
-        for (int c = 0; c < n; ++c) {
-            const int i = idx(r, c);
-            if (i < 0 || i >= m_masks.size())
-                continue;
+        const quint32 m = m_masks[i];
+        if (!isCertainMask(m)) continue;
 
-            const quint32 m = (m_masks[i] & fullMask());
-            if (!isSingleton(m))
-                continue;
+        const int r = i / n;
+        const int c = i % n;
+        const int it = bitIndex(m);
+        if (it < 0 || it >= n) continue;
 
-            // If fixed array exists, only build “Given” clues from fixed cells.
-            // If fixed array is missing (older saves), fall back to treating any singleton as “given”.
-            if (haveFixed && !m_fixed[i])
-                continue;
-
-            Clue cl;
-            cl.type = 0;          // 0 = Given (your current convention)
-            cl.row  = r;
-            cl.col  = c;
-            cl.item = singletonIndex(m);
-
-            m_clues.push_back(cl);
-
-            ClueGroup g;
-            g.orient = Horizontal;   // render as horizontal strips for now
-            g.clues.clear();
-            g.clues.push_back(cl);
-            m_clueGroups.push_back(g);
-        }
+        Clue cl;
+        cl.type = 0;   // 0 = Given (your current convention)
+        cl.row  = r;
+        cl.col  = c;
+        cl.item = it;
+        givens.push_back(cl);
     }
 
-    emit cluesChanged();
+    // Keep a stable order (nice UX)
+    std::sort(givens.begin(), givens.end(), [](const Clue &a, const Clue &b) {
+        if (a.row != b.row) return a.row < b.row;
+        return a.col < b.col;
+    });
+
+    // 2) Split givens into vertical + horizontal buckets (alternating)
+    QVector<Clue> vList;
+    QVector<Clue> hList;
+    vList.reserve((givens.size() + 1) / 2);
+    hList.reserve(givens.size() / 2);
+
+    for (int k = 0; k < givens.size(); ++k) {
+        if ((k % 2) == 0) vList.push_back(givens[k]);
+        else              hList.push_back(givens[k]);
+    }
+
+    // 3) Chunk each bucket into groups of 2–3 clues
+    const int maxPerGroup = (n <= 4) ? 2 : 3;
+
+    auto appendGroups = [&](const QVector<Clue> &list, ClueOrient orient) {
+        for (int i = 0; i < list.size(); ) {
+            ClueGroup g;
+            g.orient = orient;
+
+            const int take = qMin(maxPerGroup, list.size() - i);
+            g.clues.reserve(take);
+            for (int t = 0; t < take; ++t)
+                g.clues.push_back(list[i + t]);
+
+            m_clueGroups.push_back(g);
+            i += take;
+        }
+    };
+
+    appendGroups(vList, Vertical);
+    appendGroups(hList, Horizontal);
+
     emit clueGroupsChanged();
 }
 
