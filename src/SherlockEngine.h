@@ -72,9 +72,6 @@ public:
     enum ClueOrient { Vertical = 0, Horizontal = 1 };
     Q_ENUM(ClueOrient)
 
-    Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY cluesChanged)
-    
-
 signals:
     void sizeChanged();
     void boardChanged();

@@ -139,8 +139,8 @@ Item {
     }
 
     Column {
-        x: margin
-        width: parent.width - 2*margin
+        x: cluePanel.margin
+        width: parent.width - 2*cluePanel.margin
         spacing: Theme.paddingMedium
 
         // ---- Vertical clues (top): grid with n columns, each column is a stack
