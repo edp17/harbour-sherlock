@@ -125,11 +125,28 @@ Page
                     hGroups = h
                 }
 
-                Component.onCompleted: updateGroups()
+                Component.onCompleted: {
+                    updateGroups()
+                    // Temporary debug
+                    console.log("[clues] vGroups =", cluePanel.vGroups ? cluePanel.vGroups.length : "null",
+                                "hGroups =", cluePanel.hGroups ? cluePanel.hGroups.length : "null")
+                    if (cluePanel.vGroups && cluePanel.vGroups.length > 0)
+                        console.log("[clues] vGroups[0] =", JSON.stringify(cluePanel.vGroups[0]))
+                    if (cluePanel.hGroups && cluePanel.hGroups.length > 0)
+                        console.log("[clues] hGroups[0] =", JSON.stringify(cluePanel.hGroups[0]))
+                }
 
                 Connections {
                     target: sherlockEngine
                     onClueGroupsChanged: cluePanel.updateGroups()
+                }
+
+                // TEMP DEBUG HEADER
+                Label {
+                    width: parent.width
+                    text: "Vertical clue groups: " + cluePanel.vGroups.length
+                    color: Theme.secondaryColor
+                    font.pixelSize: Theme.fontSizeSmall
                 }
 
                 // Vertical clues area (empty for now, but space is now correct)
@@ -148,6 +165,14 @@ Page
                             }
                         }
                     }
+                }
+
+                // TEMP DEBUG HEADER
+                Label {
+                    width: parent.width
+                    text: "Horizontal clue groups: " + cluePanel.hGroups.length
+                    color: Theme.secondaryColor
+                    font.pixelSize: Theme.fontSizeSmall
                 }
 
                 // Horizontal clues (your current “Given strips” live here)
