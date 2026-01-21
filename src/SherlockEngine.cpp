@@ -217,84 +217,72 @@ QVariantList SherlockEngine::clues() const
 
 void SherlockEngine::rebuildClues()
 {
-    m_clueGroups.clear();
-
     const int n = m_size;
     const int cells = n * n;
 
-    // 1) Collect "given" clues from fixed cells (certain masks)
-    QVector<Clue> givens;
-    givens.reserve(cells);
+    m_clues.clear();
+    m_clueGroups.clear();
 
-    auto isCertainMask = [](quint32 m) -> bool {
-        return m != 0 && ((m & (m - 1)) == 0);
-    };
-
-    auto bitIndex = [](quint32 m) -> int {
-        // m is power-of-two here
-        for (int i = 0; i < 32; ++i) {
-            if (m == (1u << i)) return i;
-        }
-        return -1;
-    };
-
+    // Collect "given" clues from fixed cells:
+    // clue says: at (row,col) the solution item is 'item'
     for (int i = 0; i < cells; ++i) {
-        if (!m_fixed[i]) continue;
-
-        const quint32 m = m_masks[i];
-        if (!isCertainMask(m)) continue;
+        if (!isFixedIndex(i))
+            continue;
 
         const int r = i / n;
         const int c = i % n;
-        const int it = bitIndex(m);
-        if (it < 0 || it >= n) continue;
 
         Clue cl;
-        cl.type = 0;   // 0 = Given (your current convention)
+        cl.type = 0;                 // keep your meaning: 0 = Given for now
         cl.row  = r;
         cl.col  = c;
-        cl.item = it;
-        givens.push_back(cl);
+        cl.item = (i < m_solution.size()) ? m_solution[i] : 0;
+
+        m_clues.push_back(cl);
     }
 
-    // Keep a stable order (nice UX)
-    std::sort(givens.begin(), givens.end(), [](const Clue &a, const Clue &b) {
-        if (a.row != b.row) return a.row < b.row;
-        return a.col < b.col;
-    });
-
-    // 2) Split givens into vertical + horizontal buckets (alternating)
-    QVector<Clue> vList;
-    QVector<Clue> hList;
-    vList.reserve((givens.size() + 1) / 2);
-    hList.reserve(givens.size() / 2);
-
-    for (int k = 0; k < givens.size(); ++k) {
-        if ((k % 2) == 0) vList.push_back(givens[k]);
-        else              hList.push_back(givens[k]);
+    // Bucket clues by column (vertical) and by row (horizontal)
+    QVector<QVector<Clue>> byCol(n), byRow(n);
+    for (const Clue &cl : m_clues) {
+        if (cl.col >= 0 && cl.col < n) byCol[cl.col].push_back(cl);
+        if (cl.row >= 0 && cl.row < n) byRow[cl.row].push_back(cl);
     }
 
-    // 3) Chunk each bucket into groups of 2–3 clues
-    const int maxPerGroup = (n <= 4) ? 2 : 3;
+    // Sort within each bucket so groups are stable
+    for (int c = 0; c < n; ++c) {
+        std::sort(byCol[c].begin(), byCol[c].end(), [](const Clue &a, const Clue &b) {
+            return a.row < b.row;
+        });
+    }
+    for (int r = 0; r < n; ++r) {
+        std::sort(byRow[r].begin(), byRow[r].end(), [](const Clue &a, const Clue &b) {
+            return a.col < b.col;
+        });
+    }
 
-    auto appendGroups = [&](const QVector<Clue> &list, ClueOrient orient) {
-        for (int i = 0; i < list.size(); ) {
+    // Helper: chunk a vector into groups of up to 3 (DOS-ish: 2–3 is typical, 1 is OK too)
+    auto appendChunked = [&](int orient, const QVector<Clue> &v) {
+        const int maxPerGroup = 3;
+        for (int i = 0; i < v.size(); i += maxPerGroup) {
             ClueGroup g;
             g.orient = orient;
-
-            const int take = qMin(maxPerGroup, list.size() - i);
-            g.clues.reserve(take);
-            for (int t = 0; t < take; ++t)
-                g.clues.push_back(list[i + t]);
-
+            g.clues.clear();
+            for (int k = 0; k < maxPerGroup && (i + k) < v.size(); ++k)
+                g.clues.push_back(v[i + k]);
             m_clueGroups.push_back(g);
-            i += take;
         }
     };
 
-    appendGroups(vList, Vertical);
-    appendGroups(hList, Horizontal);
+    // Vertical groups first, then horizontal groups
+    for (int c = 0; c < n; ++c)
+        if (!byCol[c].isEmpty())
+            appendChunked(int(Vertical), byCol[c]);
 
+    for (int r = 0; r < n; ++r)
+        if (!byRow[r].isEmpty())
+            appendChunked(int(Horizontal), byRow[r]);
+
+    emit cluesChanged();
     emit clueGroupsChanged();
 }
 
