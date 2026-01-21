@@ -180,7 +180,7 @@ Page
                                     model: modelData.clues
                                     // If you use import "../components" as Components:
                                     // Components.ClueStrip { clue: modelData }
-                                    ClueStrip { clue: modelData }
+                                    Components.ClueStrip { clue: modelData }
                                 }
                             }
                         }
