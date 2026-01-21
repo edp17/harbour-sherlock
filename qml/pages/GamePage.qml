@@ -100,74 +100,94 @@ Page
 
             // Clues under the board (DOS-like: vertical on top, horizontal below)
             SectionHeader { text: "Clues" }
-// --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
-Column {
-    id: cluePanel
-    width: parent.width
-    spacing: Theme.paddingMedium
-    x: Theme.horizontalPageMargin
 
-    property var vGroups: []
-    property var hGroups: []
-
-    function updateGroups() {
-        var gs = sherlockEngine.clueGroups
-        var v = []
-        var h = []
-        for (var i = 0; gs && i < gs.length; ++i) {
-            var g = gs[i]
-            if (!g) continue
-            if (g.orient === 0) v.push(g)   // 0 = Vertical
-            else h.push(g)                  // 1 = Horizontal
-        }
-        vGroups = v
-        hGroups = h
-    }
-
-    Component.onCompleted: updateGroups()
-
-    Connections {
-        target: sherlockEngine
-        onClueGroupsChanged: cluePanel.updateGroups()
-    }
-
-    // Vertical clues area (empty for now, but space is now correct)
-    Row {
-        width: parent.width
-        spacing: Theme.paddingSmall
-        visible: cluePanel.vGroups.length > 0
-
-        Repeater {
-            model: cluePanel.vGroups
+            // --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
             Column {
-                spacing: Theme.paddingSmall
-                Repeater {
-                    model: modelData.clues
-                    Components.ClueStrip { clue: modelData }
+                id: cluePanel
+                width: parent.width
+                spacing: Theme.paddingMedium
+                x: Theme.horizontalPageMargin
+
+                property var vGroups: []
+                property var hGroups: []
+
+                function updateGroups() {
+                    var gs = sherlockEngine.clueGroups
+                    var v = []
+                    var h = []
+                    for (var i = 0; gs && i < gs.length; ++i) {
+                        var g = gs[i]
+                        if (!g) continue
+                        if (g.orient === 0) v.push(g)   // 0 = Vertical
+                        else h.push(g)                  // 1 = Horizontal
+                    }
+                    vGroups = v
+                    hGroups = h
+                }
+
+                Component.onCompleted: updateGroups()
+
+                Connections {
+                    target: sherlockEngine
+                    onClueGroupsChanged: cluePanel.updateGroups()
+                }
+
+                // Vertical clues area (empty for now, but space is now correct)
+                Row {
+                    width: parent.width
+                    spacing: Theme.paddingSmall
+                    visible: cluePanel.vGroups.length > 0
+
+                    Repeater {
+                        model: cluePanel.vGroups
+                        Column {
+                            spacing: Theme.paddingSmall
+                            Repeater {
+                                model: modelData.clues
+                                Components.ClueStrip { clue: modelData }
+                            }
+                        }
+                    }
+                }
+
+                // Horizontal clues (your current “Given strips” live here)
+                SilicaFlickable {
+                    id: hScroll
+                    width: parent.width
+                    height: hRow.implicitHeight
+                    contentWidth: hRow.width
+                    contentHeight: hRow.implicitHeight
+                    clip: true
+                    interactive: true
+                    visible: cluePanel.hGroups.length > 0
+
+                    // Helps inside a vertical flickable
+                    flickableDirection: Flickable.HorizontalFlick
+                    pressDelay: 100
+
+                    Row {
+                        id: hRow
+                        spacing: Theme.paddingSmall
+
+                        Repeater {
+                            model: cluePanel.hGroups
+
+                            // each group is a Row of ClueStrips
+                            Row {
+                                spacing: Theme.paddingSmall
+
+                                Repeater {
+                                    model: modelData.clues
+                                    // If you use import "../components" as Components:
+                                    // Components.ClueStrip { clue: modelData }
+                                    ClueStrip { clue: modelData }
+                                }
+                            }
+                        }
+                    }
                 }
             }
-        }
-    }
-
-    // Horizontal clues (your current “Given strips” live here)
-    Row {
-        width: parent.width
-        spacing: Theme.paddingSmall
-        visible: cluePanel.hGroups.length > 0
-
-        Repeater {
-            model: cluePanel.hGroups
-            Row {
-                spacing: Theme.paddingSmall
-                Repeater {
-                    model: modelData.clues
-                    Components.ClueStrip { clue: modelData }
-                }
-            }
-        }
-    }
-}
-// --- end clues panel ---
+            // --- end clues panel ---
         }
     }
 
