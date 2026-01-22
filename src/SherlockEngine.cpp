@@ -220,69 +220,64 @@ void SherlockEngine::rebuildClues()
     const int n = m_size;
     const int cells = n * n;
 
-    m_clues.clear();
-    m_clueGroups.clear();
+    // Collect givens by column/row
+    QVector<QVector<Clue>> byCol(n);
+    QVector<QVector<Clue>> byRow(n);
 
-    // Collect "given" clues from fixed cells:
-    // clue says: at (row,col) the solution item is 'item'
+    auto maskToItem = [](quint32 m) -> int {
+        // expects m has exactly 1 bit set
+        for (int k = 0; k < 32; ++k) {
+            if (m & (1u << k)) return k;
+        }
+        return 0;
+    };
+
     for (int i = 0; i < cells; ++i) {
-        if (!isFixedIndex(i))
+        if (i >= m_fixed.size() || i >= m_masks.size())
+            break;
+
+        if (!m_fixed[i])
             continue;
 
         const int r = i / n;
         const int c = i % n;
 
         Clue cl;
-        cl.type = 0;                 // keep your meaning: 0 = Given for now
-        cl.row  = r;
-        cl.col  = c;
-        cl.item = (i < m_solution.size()) ? m_solution[i] : 0;
+        cl.type = 0;               // "Given" for now (matches your current usage)
+        cl.row  = r;               // board row (A..)
+        cl.col  = c;               // board col (1..)
+        cl.item = maskToItem(m_masks[i]); // icon item (0..n-1)
 
-        m_clues.push_back(cl);
+        byCol[c].push_back(cl);
+        byRow[r].push_back(cl);
     }
 
-    // Bucket clues by column (vertical) and by row (horizontal)
-    QVector<QVector<Clue>> byCol(n), byRow(n);
-    for (const Clue &cl : m_clues) {
-        if (cl.col >= 0 && cl.col < n) byCol[cl.col].push_back(cl);
-        if (cl.row >= 0 && cl.row < n) byRow[cl.row].push_back(cl);
-    }
+    QVector<ClueGroup> groups;
+    groups.reserve(2 * n);
 
-    // Sort within each bucket so groups are stable
+    // Vertical: one group per column (orient = 0)
     for (int c = 0; c < n; ++c) {
-        std::sort(byCol[c].begin(), byCol[c].end(), [](const Clue &a, const Clue &b) {
-            return a.row < b.row;
-        });
+        if (byCol[c].isEmpty())
+            continue;
+
+        ClueGroup g;
+        g.orient = 0;          // vertical
+        g.clues  = byCol[c];
+        groups.push_back(g);
     }
+
+    // Horizontal: one group per row (orient = 1)
     for (int r = 0; r < n; ++r) {
-        std::sort(byRow[r].begin(), byRow[r].end(), [](const Clue &a, const Clue &b) {
-            return a.col < b.col;
-        });
+        if (byRow[r].isEmpty())
+            continue;
+
+        ClueGroup g;
+        g.orient = 1;          // horizontal
+        g.clues  = byRow[r];
+        groups.push_back(g);
     }
 
-    // Helper: chunk a vector into groups of up to 3 (DOS-ish: 2–3 is typical, 1 is OK too)
-    auto appendChunked = [&](int orient, const QVector<Clue> &v) {
-        const int maxPerGroup = 3;
-        for (int i = 0; i < v.size(); i += maxPerGroup) {
-            ClueGroup g;
-            g.orient = orient;
-            g.clues.clear();
-            for (int k = 0; k < maxPerGroup && (i + k) < v.size(); ++k)
-                g.clues.push_back(v[i + k]);
-            m_clueGroups.push_back(g);
-        }
-    };
-
-    // Vertical groups first, then horizontal groups
-    for (int c = 0; c < n; ++c)
-        if (!byCol[c].isEmpty())
-            appendChunked(int(Vertical), byCol[c]);
-
-    for (int r = 0; r < n; ++r)
-        if (!byRow[r].isEmpty())
-            appendChunked(int(Horizontal), byRow[r]);
-
-    emit cluesChanged();
+    m_clueGroups = groups;
     emit clueGroupsChanged();
 }
 
