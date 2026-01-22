@@ -196,11 +196,21 @@ Page
                                         // each clue inside the group
                                         Repeater {
                                             model: modelData.clues
-                                            Components.ClueStrip {
-                                                clue: modelData
-                                                orient: 0          // vertical: arrow down
-                                                showArrow: true
-                                                showPosition: true
+
+                                            Item {
+                                                width: vGrid.colW
+                                                height: clueStrip.implicitHeight
+                                                clip: true
+
+                                                Components.ClueStrip {
+                                                    id: clueStrip
+                                                    anchors.fill: parent
+
+                                                    clue: modelData
+                                                    orient: 0          // vertical
+                                                    showArrow: true    // keep for now
+                                                    showPosition: false // IMPORTANT: prevents “wide” strips in vertical area
+                                                }
                                             }
                                         }
                                     }
