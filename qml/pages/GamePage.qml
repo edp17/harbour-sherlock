@@ -141,71 +141,129 @@ Page
                     onClueGroupsChanged: cluePanel.updateGroups()
                 }
 
-                // TEMP DEBUG HEADER
-                Label {
-                    width: parent.width
-                    text: "Vertical clue groups: " + cluePanel.vGroups.length
-                    color: Theme.secondaryColor
-                    font.pixelSize: Theme.fontSizeSmall
+                // Optional debug (set true temporarily)
+                property bool showClueDebug: false
+
+                function groupCol(g) {
+                    return (g && g.clues && g.clues.length > 0) ? Number(g.clues[0].col) : -1
+                }
+                function groupRow(g) {
+                    return (g && g.clues && g.clues.length > 0) ? Number(g.clues[0].row) : -1
+                }
+                function groupsForCol(col) {
+                    var out = []
+                    for (var i = 0; cluePanel.vGroups && i < cluePanel.vGroups.length; ++i) {
+                        var g = cluePanel.vGroups[i]
+                        if (groupCol(g) === col) out.push(g)
+                    }
+                    return out
+                }
+                function groupsForRow(row) {
+                    var out = []
+                    for (var i = 0; cluePanel.hGroups && i < cluePanel.hGroups.length; ++i) {
+                        var g = cluePanel.hGroups[i]
+                        if (groupRow(g) === row) out.push(g)
+                    }
+                    return out
                 }
 
-                // Vertical clues area (empty for now, but space is now correct)
-                Row {
+                // --- VERTICAL CLUES (top): fixed n columns aligned under the board ---
+                Column {
                     width: parent.width
                     spacing: Theme.paddingSmall
                     visible: cluePanel.vGroups.length > 0
 
-                    Repeater {
-                        model: cluePanel.vGroups
-                        Column {
-                            spacing: Theme.paddingSmall
-                            Repeater {
-                                model: modelData.clues
-                                Components.ClueStrip { clue: modelData }
+                    Label {
+                        visible: cluePanel.showClueDebug
+                        width: parent.width
+                        text: "Vertical clue groups: " + cluePanel.vGroups.length
+                        color: Theme.secondaryColor
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
+
+                    Grid {
+                        id: vGrid
+                        width: parent.width
+                        columns: sherlockEngine.size
+                        spacing: Theme.paddingSmall
+
+                        readonly property real colW: Math.floor(
+                            (width - (columns - 1) * spacing) / columns
+                        )
+
+                        Repeater {
+                            model: sherlockEngine.size   // columns 0..n-1
+                            Column {
+                                width: vGrid.colW
+                                spacing: Theme.paddingSmall
+
+                                readonly property int colIndex: index
+                                readonly property var colGroups: cluePanel.groupsForCol(colIndex)
+
+                                // Each group in this column (stacked)
+                                Repeater {
+                                    model: colGroups
+                                    Column {
+                                        spacing: Theme.paddingSmall
+
+                                        // Each clue inside the group
+                                        Repeater {
+                                            model: modelData.clues
+                                            Components.ClueStrip { clue: modelData }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
                 }
 
-                // TEMP DEBUG HEADER
-                Label {
+                // --- HORIZONTAL CLUES (bottom): up to n rows, each row scrolls horizontally ---
+                Column {
                     width: parent.width
-                    text: "Horizontal clue groups: " + cluePanel.hGroups.length
-                    color: Theme.secondaryColor
-                    font.pixelSize: Theme.fontSizeSmall
-                }
-
-                // Horizontal clues (your current “Given strips” live here)
-                SilicaFlickable {
-                    id: hScroll
-                    width: parent.width
-                    height: hRow.implicitHeight
-                    contentWidth: hRow.width
-                    contentHeight: hRow.implicitHeight
-                    clip: true
-                    interactive: true
+                    spacing: Theme.paddingSmall
                     visible: cluePanel.hGroups.length > 0
 
-                    // Helps inside a vertical flickable
-                    flickableDirection: Flickable.HorizontalFlick
-                    pressDelay: 100
+                    Label {
+                        visible: cluePanel.showClueDebug
+                        width: parent.width
+                        text: "Horizontal clue groups: " + cluePanel.hGroups.length
+                        color: Theme.secondaryColor
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
 
-                    Row {
-                        id: hRow
-                        spacing: Theme.paddingSmall
+                    Repeater {
+                        model: sherlockEngine.size   // rows 0..n-1
+                        SilicaFlickable {
+                            id: rowScroll
+                            width: parent.width
 
-                        Repeater {
-                            model: cluePanel.hGroups
+                            readonly property int rowIndex: index
+                            readonly property var rowGroups: cluePanel.groupsForRow(rowIndex)
 
-                            // each group is a Row of ClueStrips
+                            visible: rowGroups.length > 0
+                            height: rowRow.implicitHeight
+
+                            contentWidth: rowRow.width
+                            contentHeight: rowRow.implicitHeight
+                            clip: true
+                            interactive: true
+                            flickableDirection: Flickable.HorizontalFlick
+                            pressDelay: 100
+
                             Row {
+                                id: rowRow
                                 spacing: Theme.paddingSmall
 
                                 Repeater {
-                                    model: modelData.clues
-                                    // If you use import "../components" as Components:
-                                    // Components.ClueStrip { clue: modelData }
-                                    Components.ClueStrip { clue: modelData }
+                                    model: rowScroll.rowGroups
+                                    Row {
+                                        spacing: Theme.paddingSmall
+                                        Repeater {
+                                            model: modelData.clues
+                                            Components.ClueStrip { clue: modelData }
+                                        }
+                                    }
                                 }
                             }
                         }
