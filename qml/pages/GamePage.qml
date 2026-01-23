@@ -114,71 +114,25 @@ Page
                 readonly property int n: sherlockEngine.size
 
                 x: margin
-                width: parent.width - 2*margin
+                width: parent.width - 2 * margin
                 spacing: Theme.paddingMedium
 
-                property var vGroups: []
-                property var hGroups: []
+                // Direct binding: updates automatically when SherlockEngine emits clueGroupsChanged
+                readonly property var groups: sherlockEngine.clueGroups || []
 
-                function updateGroups() {
-                    var gs = sherlockEngine.clueGroups
-                    var v = []
-                    var h = []
-                    for (var i = 0; gs && i < gs.length; ++i) {
-                        var g = gs[i]
-                        if (!g) continue
-                        if (Number(g.orient) === 0) v.push(g)  // 0 = Vertical
-                        else                        h.push(g)  // 1 = Horizontal
-                    }
-                    vGroups = v
-                    hGroups = h
+                function vGroup(col) {
+                    return (groups && groups.length > col) ? groups[col] : null
                 }
 
-                Component.onCompleted: updateGroups()
-
-                Connections {
-                    target: sherlockEngine
-                    onClueGroupsChanged: cluePanel.updateGroups()
-                }
-
-                function isVertical(g)  { return Number(g.orient) === 0 }
-                function isHorizontal(g){ return Number(g.orient) === 1 }
-
-                function groupIndex(g) {
-                    if (!g) return -1
-                    if (g.index === undefined || g.index === null) return -1
-                    return Number(g.index)
-                }
-
-                function vGroupForCol(col) {
-                    var out = []
-                    var all = sherlockEngine.clueGroups
-                    if (!all) return out
-                    for (var i = 0; i < all.length; ++i) {
-                        var g = all[i]
-                        if (isVertical(g) && groupIndex(g) === col)
-                            out.push(g)
-                    }
-                    return out
-                }
-
-                function hGroupForRow(row) {
-                    var out = []
-                    var all = sherlockEngine.clueGroups
-                    if (!all) return out
-                    for (var i = 0; i < all.length; ++i) {
-                        var g = all[i]
-                        if (isHorizontal(g) && groupIndex(g) === row)
-                            out.push(g)
-                    }
-                    return out
+                function hGroup(row) {
+                    var i = n + row
+                    return (groups && groups.length > i) ? groups[i] : null
                 }
 
                 // --- VERTICAL CLUES (top): n columns aligned under the board ---
                 Column {
                     width: parent.width
                     spacing: page.gap
-                    visible: cluePanel.vGroups && cluePanel.vGroups.length > 0
 
                     Grid {
                         id: vGrid
@@ -189,41 +143,29 @@ Page
                         readonly property real colW: Math.floor((width - (columns - 1) * spacing) / columns)
 
                         Repeater {
-                            model: cluePanel.n  // columns 0..n-1
+                            model: cluePanel.n   // columns 0..n-1
 
                             Column {
                                 width: vGrid.colW
                                 spacing: page.gap
 
-                                readonly property int colIndex: index
-                                readonly property var colGroups: cluePanel.vGroupForCol(colIndex)
+                                readonly property var g: cluePanel.vGroup(index)
 
-                                // stack groups within this column
                                 Repeater {
-                                    model: colGroups
+                                    model: (g && g.clues) ? g.clues : []
 
-                                    Column {
-                                        spacing: page.gap
+                                    Item {
+                                        width: vGrid.colW
+                                        height: clueStrip.implicitHeight
+                                        clip: true
 
-                                        // each clue inside the group
-                                        Repeater {
-                                            model: modelData.clues
-
-                                            Item {
-                                                width: vGrid.colW
-                                                height: clueStrip.implicitHeight
-                                                clip: true
-
-                                                Components.ClueStrip {
-                                                    id: clueStrip
-                                                    anchors.fill: parent
-
-                                                    clue: modelData
-                                                    orient: 0          // vertical
-                                                    showArrow: true    // keep for now
-                                                    showPosition: false // IMPORTANT: prevents “wide” strips in vertical area
-                                                }
-                                            }
+                                        Components.ClueStrip {
+                                            id: clueStrip
+                                            anchors.fill: parent
+                                            clue: modelData
+                                            orient: 0        // vertical
+                                            showArrow: true
+                                            showPosition: false
                                         }
                                     }
                                 }
@@ -236,10 +178,9 @@ Page
                 Column {
                     width: parent.width
                     spacing: page.gap
-                    visible: cluePanel.hGroups && cluePanel.hGroups.length > 0
 
                     Repeater {
-                        model: cluePanel.n  // rows 0..n-1
+                        model: cluePanel.n       // rows 0..n-1
 
                         SilicaFlickable {
                             id: rowScroll
@@ -250,7 +191,7 @@ Page
                             pressDelay: 100
 
                             readonly property int rowIndex: index
-                            readonly property var rowGroups: cluePanel.hGroupForRow(rowIndex)
+                            readonly property var g: cluePanel.hGroup(rowIndex)
 
                             height: rowRow.implicitHeight
                             contentWidth: rowRow.width
@@ -261,20 +202,13 @@ Page
                                 spacing: page.gap
 
                                 Repeater {
-                                    model: rowScroll.rowGroups
+                                    model: (g && g.clues) ? g.clues : []
 
-                                    Row {
-                                        spacing: page.gap
-
-                                        Repeater {
-                                            model: modelData.clues
-                                            Components.ClueStrip {
-                                                clue: modelData
-                                                orient: 1          // horizontal: arrow right
-                                                showArrow: true
-                                                showPosition: true
-                                            }
-                                        }
+                                    Components.ClueStrip {
+                                        clue: modelData
+                                        orient: 1         // horizontal
+                                        showArrow: true
+                                        showPosition: true
                                     }
                                 }
                             }

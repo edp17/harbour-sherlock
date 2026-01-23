@@ -565,7 +565,7 @@ bool SherlockEngine::loadSherlockShiFromDataDir()
     ShiReader::Result r = reader.tryLoad(path);
 
     // Always emit the diagnostic dump to console to guide parser work.
-    qInfo().noquote() << r.diagnostic;
+//    qInfo().noquote() << r.diagnostic;
 
     if (!r.ok) {
         m_hasImages = false;
