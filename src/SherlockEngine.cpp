@@ -255,25 +255,19 @@ void SherlockEngine::rebuildClues()
     QVector<ClueGroup> groups;
     groups.reserve(2 * n);
 
-    // Vertical: one group per column (orient = 0)
+    // Vertical: ALWAYS one group per column (orient = 0)
     for (int c = 0; c < n; ++c) {
-        if (byCol[c].isEmpty())
-            continue;
-
         ClueGroup g;
         g.orient = 0;          // vertical
-        g.clues  = byCol[c];
+        g.clues = byCol[c];    // may be empty
         groups.push_back(g);
     }
 
-    // Horizontal: one group per row (orient = 1)
+    // Horizontal: ALWAYS one group per row (orient = 1)
     for (int r = 0; r < n; ++r) {
-        if (byRow[r].isEmpty())
-            continue;
-
         ClueGroup g;
         g.orient = 1;          // horizontal
-        g.clues  = byRow[r];
+        g.clues = byRow[r];    // may be empty
         groups.push_back(g);
     }
 
