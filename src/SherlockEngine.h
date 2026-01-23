@@ -130,7 +130,7 @@ private:
     QVector<Clue> m_clues;
     struct ClueGroup {
         int orient = Vertical;     // 0=Vertical, 1=Horizontal
-        int index = 0;             // 0..(n-1), column for vertical, row for horizontal
+        int index = -1;             // 0..(n-1), column for vertical, row for horizontal
         QVector<Clue> clues;       // 2..3 entries ideally
     };
 

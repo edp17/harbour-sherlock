@@ -141,31 +141,37 @@ Page
                     onClueGroupsChanged: cluePanel.updateGroups()
                 }
 
-                function groupCol(g) { return (g && g.orient === 0) ? g.index : -1 }
-                function groupRow(g) { return (g && g.orient === 1) ? g.index : -1 }
+                function isVertical(g)  { return Number(g.orient) === 0 }
+                function isHorizontal(g){ return Number(g.orient) === 1 }
 
-                function groupsForCol(col) {
-                    var res = []
-                    var gs = sherlockEngine.clueGroups
-                    if (!gs) return res
-                    for (var i = 0; i < gs.length; ++i) {
-                        var g = gs[i]
-                        if (g.orient === 0 && g.index === col)
-                            res.push(g)
-                    }
-                    return res
+                function groupIndex(g) {
+                    if (!g) return -1
+                    if (g.index === undefined || g.index === null) return -1
+                    return Number(g.index)
                 }
 
-                function groupsForRow(row) {
-                    var res = []
-                    var gs = sherlockEngine.clueGroups
-                    if (!gs) return res
-                    for (var i = 0; i < gs.length; ++i) {
-                        var g = gs[i]
-                        if (g.orient === 1 && g.index === row)
-                            res.push(g)
+                function vGroupForCol(col) {
+                    var out = []
+                    var all = sherlockEngine.clueGroups
+                    if (!all) return out
+                    for (var i = 0; i < all.length; ++i) {
+                        var g = all[i]
+                        if (isVertical(g) && groupIndex(g) === col)
+                            out.push(g)
                     }
-                    return res
+                    return out
+                }
+
+                function hGroupForRow(row) {
+                    var out = []
+                    var all = sherlockEngine.clueGroups
+                    if (!all) return out
+                    for (var i = 0; i < all.length; ++i) {
+                        var g = all[i]
+                        if (isHorizontal(g) && groupIndex(g) === row)
+                            out.push(g)
+                    }
+                    return out
                 }
 
                 // --- VERTICAL CLUES (top): n columns aligned under the board ---
@@ -190,7 +196,7 @@ Page
                                 spacing: page.gap
 
                                 readonly property int colIndex: index
-                                readonly property var colGroups: cluePanel.groupsForCol(colIndex)
+                                readonly property var colGroups: cluePanel.vGroupForCol(colIndex)
 
                                 // stack groups within this column
                                 Repeater {
@@ -244,7 +250,7 @@ Page
                             pressDelay: 100
 
                             readonly property int rowIndex: index
-                            readonly property var rowGroups: cluePanel.groupsForRow(rowIndex)
+                            readonly property var rowGroups: cluePanel.hGroupForRow(rowIndex)
 
                             height: rowRow.implicitHeight
                             contentWidth: rowRow.width
