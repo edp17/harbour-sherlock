@@ -39,6 +39,7 @@ QVariantList SherlockEngine::clueGroups() const
     for (const auto &g : m_clueGroups) {
         QVariantMap gm;
         gm["orient"] = g.orient;
+        gm["index"]  = g.index;
 
         QVariantList list;
         list.reserve(g.clues.size());
@@ -259,6 +260,7 @@ void SherlockEngine::rebuildClues()
     for (int c = 0; c < n; ++c) {
         ClueGroup g;
         g.orient = 0;          // vertical
+        g.index  = c;
         g.clues = byCol[c];    // may be empty
         groups.push_back(g);
     }
@@ -267,6 +269,7 @@ void SherlockEngine::rebuildClues()
     for (int r = 0; r < n; ++r) {
         ClueGroup g;
         g.orient = 1;          // horizontal
+        g.index  = r;
         g.clues = byRow[r];    // may be empty
         groups.push_back(g);
     }

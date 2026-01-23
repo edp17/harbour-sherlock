@@ -141,25 +141,31 @@ Page
                     onClueGroupsChanged: cluePanel.updateGroups()
                 }
 
-                function groupCol(g) { return (g && g.clues && g.clues.length > 0) ? Number(g.clues[0].col) : -1 }
-                function groupRow(g) { return (g && g.clues && g.clues.length > 0) ? Number(g.clues[0].row) : -1 }
+                function groupCol(g) { return (g && g.orient === 0) ? g.index : -1 }
+                function groupRow(g) { return (g && g.orient === 1) ? g.index : -1 }
 
                 function groupsForCol(col) {
-                    var out = []
-                    for (var i = 0; cluePanel.vGroups && i < cluePanel.vGroups.length; ++i) {
-                        var g = cluePanel.vGroups[i]
-                        if (groupCol(g) === col) out.push(g)
+                    var res = []
+                    var gs = sherlockEngine.clueGroups
+                    if (!gs) return res
+                    for (var i = 0; i < gs.length; ++i) {
+                        var g = gs[i]
+                        if (g.orient === 0 && g.index === col)
+                            res.push(g)
                     }
-                    return out
+                    return res
                 }
 
                 function groupsForRow(row) {
-                    var out = []
-                    for (var i = 0; cluePanel.hGroups && i < cluePanel.hGroups.length; ++i) {
-                        var g = cluePanel.hGroups[i]
-                        if (groupRow(g) === row) out.push(g)
+                    var res = []
+                    var gs = sherlockEngine.clueGroups
+                    if (!gs) return res
+                    for (var i = 0; i < gs.length; ++i) {
+                        var g = gs[i]
+                        if (g.orient === 1 && g.index === row)
+                            res.push(g)
                     }
-                    return out
+                    return res
                 }
 
                 // --- VERTICAL CLUES (top): n columns aligned under the board ---
@@ -240,7 +246,6 @@ Page
                             readonly property int rowIndex: index
                             readonly property var rowGroups: cluePanel.groupsForRow(rowIndex)
 
-                            visible: rowGroups && rowGroups.length > 0
                             height: rowRow.implicitHeight
                             contentWidth: rowRow.width
                             contentHeight: rowRow.implicitHeight
