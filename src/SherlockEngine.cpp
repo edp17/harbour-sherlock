@@ -291,7 +291,6 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
 
     // Derived data + notifications
     rebuildClues();
-    emit clueGroupsChanged();
     emit boardChanged();
 
     if (persist) {
@@ -408,10 +407,6 @@ void SherlockEngine::newGame()
 
     // Ensure arrays sized
     rebuildForSize();
-
-    pushUndoSnapshot();
-    clearRedo();
-
     m_undo.clear();
     m_redo.clear();
     emit undoRedoChanged();
@@ -517,22 +512,23 @@ void SherlockEngine::revealSolution()
         return;
     }
 
-    // Apply all at once (avoid saving 36 times)
-    for (int i = 0; i < cells; ++i) {
-        const int v = m_solution[i];
-        m_masks[i] = bit(v);
-    }
-
+    // Check first (before mutating) so undo/redo + “no-op” detection is correct.
     bool any = false;
     for (int i = 0; i < cells; ++i) {
-        if (m_masks[i] != bit(m_solution[i])) { any = true; break; }
+        const quint32 want = bit(m_solution[i]);
+        if (m_masks[i] != want) { any = true; break; }
     }
-    if (!any)
-        return;
+    if (!any) return;
 
     pushUndoSnapshot();
     clearRedo();
 
+    // Apply all at once (avoid saving 36 times)
+    for (int i = 0; i < cells; ++i) {
+        m_masks[i] = bit(m_solution[i]);
+    }
+
+    rebuildClues();
     emit boardChanged();
     saveState();
     emit message(QStringLiteral("Solution revealed (debug)."));
@@ -540,19 +536,23 @@ void SherlockEngine::revealSolution()
 
 void SherlockEngine::resetMarks()
 {
-
     bool any = false;
     const int cells = m_size * m_size;
     const quint32 fm = fullMask();
+
     for (int i = 0; i < cells; ++i) {
         if (m_fixed[i]) continue;
         if (m_masks[i] != fm) { any = true; break; }
     }
-    if (!any)
-        return;
+    if (!any) return;
 
     pushUndoSnapshot();
     clearRedo();
+
+    for (int i = 0; i < cells; ++i) {
+        if (m_fixed[i]) continue;
+        m_masks[i] = fm;
+    }
 
     rebuildClues();
     emit boardChanged();
