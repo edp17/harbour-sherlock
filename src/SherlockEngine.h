@@ -75,6 +75,11 @@ public:
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
 
+    Q_PROPERTY(QVariantList conflictCells READ conflictCells NOTIFY conflictCellsChanged)
+    Q_INVOKABLE QVariantList conflictCells() const;
+    Q_INVOKABLE void verify();
+
+
     IconSource iconSource() const { return m_iconSource; }
     void setIconSource(int v);
 
@@ -90,6 +95,7 @@ signals:
     void message(const QString &text);
     void iconSourceChanged();
     void undoRedoChanged();
+    void conflictCellsChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -124,6 +130,13 @@ private:
     int m_size {6};
     QVector<quint32> m_masks;
     QVector<quint8>  m_fixed;           // 1 => given/locked cell
+    // hidden solution (size*size entries, each 0..(size-1))
+    QVector<int> m_solution;
+
+    QVector<int> m_conflictCells; // stores 0..(n*n-1) indices
+    void clearConflicts();
+    void setConflicts(const QVector<int> &cells);
+
     bool m_hasImages {false};
     int m_iconEpoch {0};
 
@@ -132,9 +145,6 @@ private:
     QVector<QImage> m_halfShi;
 
     IconSource m_iconSource {Generated};
-
-    // hidden solution (size*size entries, each 0..(size-1))
-    QVector<int> m_solution;
 
     int m_undoLimit {50};
 

@@ -207,6 +207,108 @@ QVariantList SherlockEngine::boardMasks() const
     return out;
 }
 
+QVariantList SherlockEngine::conflictCells() const
+{
+    QVariantList out;
+    out.reserve(m_conflictCells.size());
+    for (int i : m_conflictCells) out.push_back(i);
+    return out;
+}
+
+void SherlockEngine::clearConflicts()
+{
+    if (m_conflictCells.isEmpty()) return;
+    m_conflictCells.clear();
+    emit conflictCellsChanged();
+}
+
+void SherlockEngine::setConflicts(const QVector<int> &cells)
+{
+    // Normalize: unique + sorted (stable for QML bindings)
+    QVector<int> tmp = cells;
+    std::sort(tmp.begin(), tmp.end());
+    tmp.erase(std::unique(tmp.begin(), tmp.end()), tmp.end());
+
+    if (tmp == m_conflictCells) return;
+    m_conflictCells = tmp;
+    emit conflictCellsChanged();
+}
+
+static inline bool isCertainMask(quint32 m)
+{
+    return m != 0 && ((m & (m - 1)) == 0);
+}
+
+static inline int maskToItem(quint32 m)
+{
+    // m has exactly 1 bit set
+    for (int k = 0; k < 32; ++k)
+        if (m & (1u << k)) return k;
+    return -1;
+}
+
+void SherlockEngine::verify()
+{
+    const int n = m_size;
+    const int cells = n * n;
+
+    QVector<int> conflicts;
+    conflicts.reserve(cells);
+
+    // 1) Any zero-mask cell is an immediate contradiction (should not happen, but verify it)
+    for (int i = 0; i < cells; ++i) {
+        if (m_masks[i] == 0) conflicts.push_back(i);
+    }
+
+    // 2) Row duplicates among certain cells
+    for (int r = 0; r < n; ++r) {
+        QVector<int> seen(n, -1); // item -> cellIndex
+        for (int c = 0; c < n; ++c) {
+            const int i = r * n + c;
+            const quint32 m = m_masks[i];
+            if (!isCertainMask(m)) continue;
+
+            const int item = maskToItem(m);
+            if (item < 0 || item >= n) continue;
+
+            if (seen[item] >= 0) {
+                conflicts.push_back(i);
+                conflicts.push_back(seen[item]);
+            } else {
+                seen[item] = i;
+            }
+        }
+    }
+
+    // 3) Column duplicates among certain cells
+    for (int c = 0; c < n; ++c) {
+        QVector<int> seen(n, -1);
+        for (int r = 0; r < n; ++r) {
+            const int i = r * n + c;
+            const quint32 m = m_masks[i];
+            if (!isCertainMask(m)) continue;
+
+            const int item = maskToItem(m);
+            if (item < 0 || item >= n) continue;
+
+            if (seen[item] >= 0) {
+                conflicts.push_back(i);
+                conflicts.push_back(seen[item]);
+            } else {
+                seen[item] = i;
+            }
+        }
+    }
+
+    setConflicts(conflicts);
+
+    if (m_conflictCells.isEmpty()) {
+        emit message(QStringLiteral("No contradictions found."));
+    } else {
+        emit message(QStringLiteral("Contradictions found: %1 cell(s).").arg(m_conflictCells.size()));
+    }
+}
+
 void SherlockEngine::pushUndoSnapshot()
 {
     m_undo.push_back(captureSnapshot());
@@ -397,6 +499,7 @@ void SherlockEngine::setMask(int row, int col, quint32 m)
     const int i = idx(row, col);
     if (m_masks[i] == m)
         return;
+    clearConflicts();
     m_masks[i] = m;
     emit boardChanged();
     saveState();

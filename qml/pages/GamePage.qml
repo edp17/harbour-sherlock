@@ -44,6 +44,10 @@ Page
                 onClicked: sherlockEngine.redo()
             }
             MenuItem {
+                text: "Verify"
+                onClicked: sherlockEngine.verify()
+            }
+            MenuItem {
                 text: "Reset Marks"
                 onClicked: sherlockEngine.resetMarks()
             }

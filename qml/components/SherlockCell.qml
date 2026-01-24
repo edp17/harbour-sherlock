@@ -7,6 +7,15 @@ Item {
     property int rowIndex: 0
     property int colIndex: 0
     property bool use16px: false
+    readonly property bool conflicted: {
+        var list = sherlockEngine.conflictCells
+        if (!list || list.length === 0) return false
+        var idx = rowIndex * n + colIndex
+        for (var k = 0; k < list.length; ++k) {
+            if (Number(list[k]) === idx) return true
+        }
+        return false
+    }
 
     readonly property int n: sherlockEngine.size
     readonly property int mask: {
@@ -62,11 +71,12 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "transparent"
-        border.width: root.isCertain ? 2 : 1
-        border.color: root.isCertain
-                      ? Theme.rgba(Theme.highlightColor, 0.65)
-                      : Theme.rgba(Theme.primaryColor, 0.25)
-        }
+        border.width: root.conflicted ? 3 : (root.isCertain ? 2 : 1)
+        border.color: root.conflicted ? Theme.errorColor
+                                      : (root.isCertain
+                                            ? Theme.rgba(Theme.highlightColor, 0.65)
+                                            : Theme.rgba(Theme.primaryColor, 0.25))
+    }
 
     // Main icon
     Image {
