@@ -97,6 +97,20 @@ private:
     void buildPlaceholderIcons();
 
 private:
+    // --- Undo/Redo snapshot (Step 1: internal) ---
+    struct Snapshot {
+        int size = 0;
+        QVector<quint32> masks;   // m_masks
+        QVector<quint8> fixed;    // m_fixed
+        QVector<int> solution;    // m_solution (keeps game identity stable for undo/redo + future “check” features)
+    };
+
+    Snapshot captureSnapshot() const;
+    bool applySnapshot(const Snapshot &s, bool persist);
+
+    QVector<Snapshot> m_undo;
+    QVector<Snapshot> m_redo;
+
     int m_size {6};
     QVector<quint32> m_masks;
     QVector<quint8>  m_fixed;           // 1 => given/locked cell
@@ -111,6 +125,8 @@ private:
 
     // hidden solution (size*size entries, each 0..(size-1))
     QVector<int> m_solution;
+
+    int m_undoLimit {50};
 
     void rebuildClues();   // placeholder generator for now
 
@@ -127,6 +143,7 @@ private:
         int col = 0;
         int item = 0;
     };
+
     QVector<Clue> m_clues;
     struct ClueGroup {
         int orient = Vertical;     // 0=Vertical, 1=Horizontal

@@ -201,6 +201,44 @@ QVariantList SherlockEngine::boardMasks() const
     return out;
 }
 
+SherlockEngine::Snapshot SherlockEngine::captureSnapshot() const
+{
+    Snapshot s;
+    s.size = m_size;
+    s.masks = m_masks;
+    s.fixed = m_fixed;
+    s.solution = m_solution;
+    return s;
+}
+
+bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
+{
+    if (s.size != m_size) {
+        // Option B: undo/redo is within the current game/size.
+        return false;
+    }
+
+    const int cells = m_size * m_size;
+    if (s.masks.size() != cells || s.fixed.size() != cells) {
+        return false;
+    }
+
+    // Restore authoritative state
+    m_masks = s.masks;
+    m_fixed = s.fixed;
+    m_solution = s.solution;
+
+    // Derived data + notifications
+    rebuildClues();
+    emit clueGroupsChanged();
+    emit boardChanged();
+
+    if (persist) {
+        saveState();
+    }
+    return true;
+}
+
 QVariantList SherlockEngine::clues() const
 {
     QVariantList out;
