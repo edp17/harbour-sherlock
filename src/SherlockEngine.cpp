@@ -88,6 +88,12 @@ void SherlockEngine::resetCell(int row, int col)
     const int i = idx(row, col);
     if (isFixedIndex(i))
         return;
+
+    if (m_masks[i] == fullMask())
+        return;
+
+    pushUndoSnapshot();
+    clearRedo();
     setMask(row, col, fullMask());
 }
 
@@ -199,6 +205,61 @@ QVariantList SherlockEngine::boardMasks() const
     for (quint32 m : m_masks)
         out.push_back(int(m));
     return out;
+}
+
+void SherlockEngine::pushUndoSnapshot()
+{
+    m_undo.push_back(captureSnapshot());
+
+    // Cap memory
+    if (m_undo.size() > m_undoLimit) {
+        const int drop = m_undo.size() - m_undoLimit;
+        m_undo.erase(m_undo.begin(), m_undo.begin() + drop);
+    }
+
+    emit undoRedoChanged();
+}
+
+void SherlockEngine::clearRedo()
+{
+    if (m_redo.isEmpty())
+        return;
+    m_redo.clear();
+    emit undoRedoChanged();
+}
+
+void SherlockEngine::undo()
+{
+    if (m_undo.isEmpty())
+        return;
+
+    // Move current to redo
+    m_redo.push_back(captureSnapshot());
+
+    // Restore previous
+    const Snapshot s = m_undo.takeLast();
+    applySnapshot(s, /*persist*/ true);
+
+    emit undoRedoChanged();
+}
+
+void SherlockEngine::redo()
+{
+    if (m_redo.isEmpty())
+        return;
+
+    // Move current to undo
+    m_undo.push_back(captureSnapshot());
+    if (m_undo.size() > m_undoLimit) {
+        const int drop = m_undo.size() - m_undoLimit;
+        m_undo.erase(m_undo.begin(), m_undo.begin() + drop);
+    }
+
+    // Restore next
+    const Snapshot s = m_redo.takeLast();
+    applySnapshot(s, /*persist*/ true);
+
+    emit undoRedoChanged();
 }
 
 SherlockEngine::Snapshot SherlockEngine::captureSnapshot() const
@@ -348,6 +409,13 @@ void SherlockEngine::newGame()
     // Ensure arrays sized
     rebuildForSize();
 
+    pushUndoSnapshot();
+    clearRedo();
+
+    m_undo.clear();
+    m_redo.clear();
+    emit undoRedoChanged();
+
     generateSolution();
 
     // Seed qrand once
@@ -455,6 +523,16 @@ void SherlockEngine::revealSolution()
         m_masks[i] = bit(v);
     }
 
+    bool any = false;
+    for (int i = 0; i < cells; ++i) {
+        if (m_masks[i] != bit(m_solution[i])) { any = true; break; }
+    }
+    if (!any)
+        return;
+
+    pushUndoSnapshot();
+    clearRedo();
+
     emit boardChanged();
     saveState();
     emit message(QStringLiteral("Solution revealed (debug)."));
@@ -462,14 +540,20 @@ void SherlockEngine::revealSolution()
 
 void SherlockEngine::resetMarks()
 {
+
+    bool any = false;
     const int cells = m_size * m_size;
+    const quint32 fm = fullMask();
     for (int i = 0; i < cells; ++i) {
-        if (m_fixed[i]) {
-            // keep the given as-is (already certain)
-            continue;
-        }
-        m_masks[i] = fullMask();
+        if (m_fixed[i]) continue;
+        if (m_masks[i] != fm) { any = true; break; }
     }
+    if (!any)
+        return;
+
+    pushUndoSnapshot();
+    clearRedo();
+
     rebuildClues();
     emit boardChanged();
     saveState();
@@ -489,6 +573,9 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
     if (newMask == 0)
         return;
 
+    pushUndoSnapshot();
+    clearRedo();
+
     setMask(row, col, newMask);
 }
 
@@ -505,6 +592,9 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
     quint32 newMask = (m & ~bit(item));
     if (newMask == 0)
         return;
+
+    pushUndoSnapshot();
+    clearRedo();
 
     setMask(row, col, newMask);
 }
@@ -557,10 +647,14 @@ void SherlockEngine::setCertain(int row, int col, int item)
 
     // If already certain to this item, undo -> reset cell
     if (m_masks[i] == b) {
+        pushUndoSnapshot();
+        clearRedo();
         setMask(row, col, fullMask());
         return;
     }
 
+    pushUndoSnapshot();
+    clearRedo();
     setMask(row, col, b);
 }
 

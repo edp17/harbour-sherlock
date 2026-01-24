@@ -66,6 +66,15 @@ public:
     // "givens" (locked cells)
     Q_INVOKABLE bool fixedAt(int row, int col) const;
 
+    Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
+    Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
+
+    Q_INVOKABLE bool canUndo() const { return !m_undo.isEmpty(); }
+    Q_INVOKABLE bool canRedo() const { return !m_redo.isEmpty(); }
+
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void redo();
+
     IconSource iconSource() const { return m_iconSource; }
     void setIconSource(int v);
 
@@ -80,6 +89,7 @@ signals:
     void imagesChanged();
     void message(const QString &text);
     void iconSourceChanged();
+    void undoRedoChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -152,4 +162,7 @@ private:
     };
 
     QVector<ClueGroup> m_clueGroups;
+
+    void pushUndoSnapshot();
+    void clearRedo();
 };

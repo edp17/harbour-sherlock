@@ -34,6 +34,16 @@ Page
                 onClicked: sherlockEngine.newGame()
             }
             MenuItem {
+                text: "Undo"
+                enabled: sherlockEngine.canUndo
+                onClicked: sherlockEngine.undo()
+            }
+            MenuItem {
+                text: "Redo"
+                enabled: sherlockEngine.canRedo
+                onClicked: sherlockEngine.redo()
+            }
+            MenuItem {
                 text: "Reset Marks"
                 onClicked: sherlockEngine.resetMarks()
             }
