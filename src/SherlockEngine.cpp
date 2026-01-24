@@ -670,16 +670,40 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
 
-    quint32 m = m_masks[i];
+    const quint32 m = m_masks[i];
 
-    quint32 newMask = (m ^ bit(item));
-    if (newMask == 0)
-        return;
+    // If already certain, do not allow pencil toggling here.
+    // (Certainty is handled via setCertain().)
+    if (m != 0 && ((m & (m - 1)) == 0)) return;
+
+    const quint32 b = bit(item);
+    quint32 newMask = (m ^ b);
+
+    // Never allow empty candidate set
+    if (newMask == 0) return;
+
+    // If no change (should not happen with XOR, but keep it safe)
+    if (newMask == m) return;
 
     pushUndoSnapshot();
     clearRedo();
+    clearConflicts();
 
-    setMask(row, col, newMask);
+    m_masks[i] = newMask;
+
+    // If this toggle leaves exactly one candidate, propagate it.
+    if ((newMask & (newMask - 1)) == 0) {
+        int chosen = -1;
+        for (int k = 0; k < m_size; ++k) {
+            if (newMask & bit(k)) { chosen = k; break; }
+        }
+        if (chosen >= 0) {
+            propagateCertain(row, col, chosen);
+        }
+    }
+
+    emit boardChanged();
+    saveState();
 }
 
 void SherlockEngine::eliminateCandidate(int row, int col, int item)
@@ -690,32 +714,48 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
 
-    quint32 m = m_masks[i];
-
-    quint32 newMask = (m & ~bit(item));
-    if (newMask == 0)
-        return;
+    const quint32 m = m_masks[i];
+    const quint32 newMask = (m & ~bit(item));
+    if (newMask == 0) return;
+    if (newMask == m) return;
 
     pushUndoSnapshot();
     clearRedo();
 
-    setMask(row, col, newMask);
+    clearConflicts();
+
+    m_masks[i] = newMask;
+
+    if ((newMask & (newMask - 1)) == 0) {
+        // single bit left -> propagate
+        int chosen = -1;
+        for (int k = 0; k < m_size; ++k) {
+            if (newMask & bit(k)) { chosen = k; break; }
+        }
+        if (chosen >= 0) propagateCertain(row, col, chosen);
+    }
+
+    emit boardChanged();
+    saveState();
 }
 
 void SherlockEngine::propagateCertain(int row, int col, int item)
 {
+    clearConflicts();
+
     // Remove 'item' from all other cells in the same row and column.
-    // Respect your invariant: never reduce a cell to 0 candidates.
 
     // Row peers
     for (int c = 0; c < m_size; ++c) {
         if (c == col) continue;
         const int ii = idx(row, c);
+        if (isFixedIndex(ii)) continue;
+
         quint32 m = m_masks[ii];
         if (m & bit(item)) {
-            quint32 nm = (m & ~bit(item));
+            const quint32 nm = (m & ~bit(item));
             if (nm != 0) {
-                m_masks[ii] = nm; // direct write: we'll emit/save once at the end
+                m_masks[ii] = nm;   // direct write; batch notify happens in caller
             }
         }
     }
@@ -724,18 +764,16 @@ void SherlockEngine::propagateCertain(int row, int col, int item)
     for (int r = 0; r < m_size; ++r) {
         if (r == row) continue;
         const int ii = idx(r, col);
+        if (isFixedIndex(ii)) continue;
+
         quint32 m = m_masks[ii];
         if (m & bit(item)) {
-            quint32 nm = (m & ~bit(item));
+            const quint32 nm = (m & ~bit(item));
             if (nm != 0) {
                 m_masks[ii] = nm;
             }
         }
     }
-
-    // Single notification + persistence
-    emit boardChanged();
-    saveState();
 }
 
 void SherlockEngine::setCertain(int row, int col, int item)
@@ -752,13 +790,24 @@ void SherlockEngine::setCertain(int row, int col, int item)
     if (m_masks[i] == b) {
         pushUndoSnapshot();
         clearRedo();
-        setMask(row, col, fullMask());
+        setMask(row, col, fullMask());   // setMask() already emits/saves
         return;
     }
 
     pushUndoSnapshot();
     clearRedo();
-    setMask(row, col, b);
+
+    clearConflicts();
+
+    // Batch update: write directly to avoid emit/save twice
+    m_masks[i] = b;
+
+    // Propagate constraints
+    propagateCertain(row, col, item);
+
+    // Single notification + persistence
+    emit boardChanged();
+    saveState();
 }
 
 bool SherlockEngine::importSherlockShi(const QString &sourcePath)
