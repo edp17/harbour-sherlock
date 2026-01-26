@@ -82,6 +82,17 @@ public:
     Q_INVOKABLE QVariantList conflictCells() const;
     Q_INVOKABLE void verify();
 
+    Q_PROPERTY(int hintCell READ hintCell NOTIFY hintChanged)
+    Q_PROPERTY(int hintItem READ hintItem NOTIFY hintChanged)
+    Q_PROPERTY(bool hasHint READ hasHint NOTIFY hintChanged)
+
+    int hintCell() const { return m_hintCell; }   // 0..n*n-1, or -1
+    int hintItem() const { return m_hintItem; }   // 0..n-1, or -1
+    bool hasHint() const { return m_hintCell >= 0 && m_hintItem >= 0; }
+
+    Q_INVOKABLE void hint();
+    Q_INVOKABLE void applyHint();
+    Q_INVOKABLE void clearHint();
 
     IconSource iconSource() const { return m_iconSource; }
     void setIconSource(int v);
@@ -100,6 +111,7 @@ signals:
     void undoRedoChanged();
     void conflictCellsChanged();
     void solvedChanged();
+    void hintChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -183,4 +195,9 @@ private:
 
     void pushUndoSnapshot();
     void clearRedo();
+
+    int m_hintCell {-1};
+    int m_hintItem {-1};
+
+    void setHint(int cell, int item);
 };

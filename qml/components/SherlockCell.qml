@@ -17,6 +17,8 @@ Item {
         return false
     }
 
+    readonly property bool hinted: sherlockEngine.hasHint && (sherlockEngine.hintCell === (rowIndex * n + colIndex))
+
     readonly property int n: sherlockEngine.size
     readonly property int mask: {
         var list = sherlockEngine.boardMasks
@@ -70,12 +72,13 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: "transparent"
-        border.width: root.conflicted ? 3 : (root.isCertain ? 2 : 1)
-        border.color: root.conflicted ? Theme.errorColor
-                                      : (root.isCertain
-                                            ? Theme.rgba(Theme.highlightColor, 0.65)
-                                            : Theme.rgba(Theme.primaryColor, 0.25))
+        color: root.hinted ? Theme.rgba("#FFC107", 0.35) : "transparent"
+        border.width: root.conflicted ? 3 : (root.hinted ? 3 : (root.isCertain ? 2 : 1))
+        border.color: root.conflicted ? "#FFC107"
+                              : (root.hinted ? Theme.highlightColor
+                                             : (root.isCertain
+                                                    ? Theme.rgba(Theme.highlightColor, 0.65)
+                                                    : Theme.rgba(Theme.primaryColor, 0.25)))
     }
 
     // Main icon

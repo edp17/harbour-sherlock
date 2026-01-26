@@ -304,6 +304,22 @@ void SherlockEngine::updateSolvedState(bool announce)
     }
 }
 
+void SherlockEngine::setHint(int cell, int item)
+{
+    if (m_hintCell == cell && m_hintItem == item) return;
+    m_hintCell = cell;
+    m_hintItem = item;
+    emit hintChanged();
+}
+
+void SherlockEngine::clearHint()
+{
+    if (m_hintCell < 0 && m_hintItem < 0) return;
+    m_hintCell = -1;
+    m_hintItem = -1;
+    emit hintChanged();
+}
+
 void SherlockEngine::verify()
 {
     const int n = m_size;
@@ -364,6 +380,102 @@ void SherlockEngine::verify()
     } else {
         emit message(QStringLiteral("Contradictions found: %1 cell(s).").arg(m_conflictCells.size()));
     }
+}
+
+void SherlockEngine::hint()
+{
+    clearHint();
+
+    if (m_solved) {
+        emit message(QStringLiteral("Already solved."));
+        return;
+    }
+
+    const int n = m_size;
+    const int cells = n * n;
+
+    // 1) Naked single: any non-fixed cell with exactly one candidate
+    for (int i = 0; i < cells; ++i) {
+        if (isFixedIndex(i)) continue;
+        const quint32 m = m_masks[i];
+        if (m != 0 && ((m & (m - 1)) == 0)) {
+            // find item
+            for (int k = 0; k < n; ++k) {
+                if (m & bit(k)) {
+                    setHint(i, k);
+                    emit message(QStringLiteral("Hint: single candidate."));
+                    return;
+                }
+            }
+        }
+    }
+
+    // 2) Hidden single in rows
+    for (int r = 0; r < n; ++r) {
+        for (int item = 0; item < n; ++item) {
+            int where = -1;
+            int count = 0;
+            const quint32 b = bit(item);
+
+            for (int c = 0; c < n; ++c) {
+                const int i = r * n + c;
+                if (isFixedIndex(i)) continue;
+                if (m_masks[i] & b) {
+                    where = i;
+                    if (++count > 1) break;
+                }
+            }
+            if (count == 1 && where >= 0) {
+                setHint(where, item);
+                emit message(QStringLiteral("Hint: only place in row."));
+                return;
+            }
+        }
+    }
+
+    // 3) Hidden single in columns
+    for (int c = 0; c < n; ++c) {
+        for (int item = 0; item < n; ++item) {
+            int where = -1;
+            int count = 0;
+            const quint32 b = bit(item);
+
+            for (int r = 0; r < n; ++r) {
+                const int i = r * n + c;
+                if (isFixedIndex(i)) continue;
+                if (m_masks[i] & b) {
+                    where = i;
+                    if (++count > 1) break;
+                }
+            }
+            if (count == 1 && where >= 0) {
+                setHint(where, item);
+                emit message(QStringLiteral("Hint: only place in column."));
+                return;
+            }
+        }
+    }
+
+    emit message(QStringLiteral("No forced move found."));
+}
+
+void SherlockEngine::applyHint()
+{
+    if (!hasHint()) {
+        emit message(QStringLiteral("No hint to apply."));
+        return;
+    }
+
+    const int n = m_size;
+    const int i = m_hintCell;
+    const int row = i / n;
+    const int col = i % n;
+
+    // Apply as a certain move (includes propagation + undo step in your current implementation)
+    setCertain(row, col, m_hintItem);
+
+    // Clear hint after applying
+    clearHint();
 }
 
 void SherlockEngine::pushUndoSnapshot()
@@ -447,6 +559,7 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
     m_masks = s.masks;
     m_fixed = s.fixed;
     m_solution = s.solution;
+    clearHint();
 
     // Derived data + notifications
     rebuildClues();
@@ -558,6 +671,7 @@ void SherlockEngine::setMask(int row, int col, quint32 m)
     if (m_masks[i] == m)
         return;
     clearConflicts();
+    clearHint();
     m_masks[i] = m;
     updateSolvedState(true);
     emit boardChanged();
@@ -571,6 +685,7 @@ void SherlockEngine::newGame()
     rebuildForSize();
     m_undo.clear();
     m_redo.clear();
+    clearHint();
     emit undoRedoChanged();
 
     generateSolution();
@@ -712,6 +827,7 @@ void SherlockEngine::resetMarks()
 
     pushUndoSnapshot();
     clearRedo();
+    clearHint();
 
     for (int i = 0; i < cells; ++i) {
         if (m_fixed[i]) continue;
@@ -749,6 +865,7 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
     pushUndoSnapshot();
     clearRedo();
     clearConflicts();
+    clearHint();
 
     m_masks[i] = newMask;
 
@@ -785,6 +902,7 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
     clearRedo();
 
     clearConflicts();
+    clearHint();
 
     m_masks[i] = newMask;
 
@@ -861,6 +979,7 @@ void SherlockEngine::setCertain(int row, int col, int item)
     clearRedo();
 
     clearConflicts();
+    clearHint();
 
     // Batch update: write directly to avoid emit/save twice
     m_masks[i] = b;

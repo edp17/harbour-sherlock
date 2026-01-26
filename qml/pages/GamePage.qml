@@ -52,6 +52,16 @@ Page
                 onClicked: sherlockEngine.resetMarks()
             }
             MenuItem {
+                text: "Hint"
+                enabled: !sherlockEngine.solved
+                onClicked: sherlockEngine.hint()
+            }
+            MenuItem {
+                text: "Apply hint"
+                enabled: sherlockEngine.hasHint && !sherlockEngine.solved
+                onClicked: sherlockEngine.applyHint()
+            }
+            MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
             }
