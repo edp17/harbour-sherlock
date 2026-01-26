@@ -99,6 +99,15 @@ Page
 
             PageHeader { title: "Sherlock" }
 
+            Label {
+                visible: sherlockEngine.solved
+                x: Theme.horizontalPageMargin
+                width: parent.width - 2*x
+                text: "Solved!"
+                color: Theme.highlightColor
+                font.bold: true
+            }
+
             Label
             {
                 width: parent.width

@@ -247,6 +247,63 @@ static inline int maskToItem(quint32 m)
     return -1;
 }
 
+bool SherlockEngine::isSolvedNow() const
+{
+    const int n = m_size;
+    const int cells = n * n;
+
+    // All cells must be certain (single-bit)
+    for (int i = 0; i < cells; ++i) {
+        const quint32 m = m_masks[i];
+        if (m == 0 || (m & (m - 1)) != 0) return false;
+    }
+
+    // No duplicates in any row/column
+    auto maskToItemLocal = [](quint32 m) -> int {
+        for (int k = 0; k < 32; ++k) if (m & (1u << k)) return k;
+        return -1;
+    };
+
+    // Rows
+    for (int r = 0; r < n; ++r) {
+        QVector<int> seen(n, 0);
+        for (int c = 0; c < n; ++c) {
+            const int i = r * n + c;
+            const int item = maskToItemLocal(m_masks[i]);
+            if (item < 0 || item >= n) return false;
+            if (seen[item]) return false;
+            seen[item] = 1;
+        }
+    }
+
+    // Cols
+    for (int c = 0; c < n; ++c) {
+        QVector<int> seen(n, 0);
+        for (int r = 0; r < n; ++r) {
+            const int i = r * n + c;
+            const int item = maskToItemLocal(m_masks[i]);
+            if (item < 0 || item >= n) return false;
+            if (seen[item]) return false;
+            seen[item] = 1;
+        }
+    }
+
+    return true;
+}
+
+void SherlockEngine::updateSolvedState(bool announce)
+{
+    const bool now = isSolvedNow();
+    if (now == m_solved) return;
+
+    m_solved = now;
+    emit solvedChanged();
+
+    if (announce && m_solved) {
+        emit message(QStringLiteral("Solved!"));
+    }
+}
+
 void SherlockEngine::verify()
 {
     const int n = m_size;
@@ -393,6 +450,7 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
 
     // Derived data + notifications
     rebuildClues();
+    updateSolvedState(false);
     emit boardChanged();
 
     if (persist) {
@@ -501,6 +559,7 @@ void SherlockEngine::setMask(int row, int col, quint32 m)
         return;
     clearConflicts();
     m_masks[i] = m;
+    updateSolvedState(true);
     emit boardChanged();
     saveState();
 }
@@ -554,6 +613,7 @@ void SherlockEngine::newGame()
 
     rebuildClues();
 
+    updateSolvedState(false);
     emit boardChanged();
     saveState();
     emit message(QStringLiteral("New game started (%1 givens).").arg(givens));
@@ -632,6 +692,7 @@ void SherlockEngine::revealSolution()
     }
 
     rebuildClues();
+    updateSolvedState(true);
     emit boardChanged();
     saveState();
     emit message(QStringLiteral("Solution revealed (debug)."));
@@ -702,6 +763,7 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
         }
     }
 
+    updateSolvedState(true);
     emit boardChanged();
     saveState();
 }
@@ -735,6 +797,7 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
         if (chosen >= 0) propagateCertain(row, col, chosen);
     }
 
+    updateSolvedState(true);
     emit boardChanged();
     saveState();
 }

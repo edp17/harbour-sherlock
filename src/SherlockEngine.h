@@ -75,6 +75,9 @@ public:
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
 
+    Q_PROPERTY(bool solved READ solved NOTIFY solvedChanged)
+    bool solved() const { return m_solved; }
+
     Q_PROPERTY(QVariantList conflictCells READ conflictCells NOTIFY conflictCellsChanged)
     Q_INVOKABLE QVariantList conflictCells() const;
     Q_INVOKABLE void verify();
@@ -96,6 +99,7 @@ signals:
     void iconSourceChanged();
     void undoRedoChanged();
     void conflictCellsChanged();
+    void solvedChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -126,6 +130,10 @@ private:
 
     QVector<Snapshot> m_undo;
     QVector<Snapshot> m_redo;
+
+    bool m_solved {false};
+    void updateSolvedState(bool announce);
+    bool isSolvedNow() const;
 
     int m_size {6};
     QVector<quint32> m_masks;

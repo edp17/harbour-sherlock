@@ -181,7 +181,7 @@ Item {
                     BackgroundItem {
                         anchors.fill: parent
                         highlightedColor: "transparent"
-                        enabled: !root.fixed
+                        enabled: !root.fixed && !sherlockEngine.solved
 
                         onClicked: {
                             // If not certain yet -> toggle normally
@@ -198,7 +198,7 @@ Item {
                         }
 
                         onPressAndHold: {
-                            if (!root.fixed)
+                            if (!root.fixed && !sherlockEngine.solved)
                                 sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
                         }
                     }
