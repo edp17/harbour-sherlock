@@ -46,7 +46,7 @@ Item {
         for (var i = 0; i < root.n; ++i) if (m & (1 << i)) c++
         return c
     }
-    readonly property bool isCertain: (mask & (mask - 1)) === 0
+    readonly property bool isCertain: (mask !== 0) && ((mask & (mask - 1)) === 0)
 
     readonly property int certainItem: {
         // returns 0..n-1 for the remaining bit
@@ -71,14 +71,14 @@ Item {
         return rowIndex * root.n + item + 1
     }
 
-function genBankFile(row, item) {
-    var ICON_N = 6
-    var idx = row * ICON_N + item + 1
-    var idx2 = (idx < 10 ? "0" : "") + idx
-    var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
-    var colNumber = item + 1
-    return idx2 + "_" + rowLetter + colNumber
-}
+    function genBankFile(row, item) {
+        var ICON_N = 6
+        var idx = row * ICON_N + item + 1
+        var idx2 = (idx < 10 ? "0" : "") + idx
+        var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
+        var colNumber = item + 1
+        return idx2 + "_" + rowLetter + colNumber + ".png"
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -116,7 +116,7 @@ function genBankFile(row, item) {
         asynchronous: true
         fillMode: Image.PreserveAspectFit
         visible: root.isCertain
-        opacity: 1.0
+//        opacity: 1
     }
 
     Rectangle {
@@ -141,42 +141,27 @@ function genBankFile(row, item) {
         }
     }
 
-    // Candidate marks overlay (2 rows, ceil(n/2) columns)
+    // Candidate marks overlay (1 row, n columns; fills the tile)
     Item {
         id: marksArea
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-//        height: Math.floor(parent.height * 0.36)
-//        anchors.margins: Theme.paddingSmall
-    anchors.top: parent.top
-    anchors.margins: 0
+        anchors.fill: parent
+        anchors.margins: 0
         z: 10
-
-        // Slight background so you can clearly see the overlay exists
-        Rectangle {
-            anchors.fill: parent
-            radius: Theme.paddingSmall
-            color: Theme.rgba(Theme.primaryColor, 0.06)
-            border.width: 1
-            border.color: Theme.rgba(Theme.primaryColor, 0.12)
-            opacity: root.fixed ? 0.5 : 1.0
-        }
 
         Grid {
             id: marksGrid
+            anchors.fill: parent
+            anchors.margins: 0
             anchors.centerIn: parent
-            columns: Math.ceil(root.n / 2)
-            spacing: Theme.paddingSmall
-            readonly property real cellSize: Math.floor(
-                Math.min(
-                    (marksArea.width  - (columns - 1) * spacing) / columns,
-                    (marksArea.height - (2 - 1) * spacing) / 2
-                )
-            )
+            readonly property int cols: Math.ceil(root.n / 2)
+            columns: cols
+            rows: 2
+            spacing: 0
+
+            readonly property real cellSize: Math.floor(Math.min(width / cols, height / 2))
 
             Repeater {
-                model: root.n  // only real candidates, no dummy cells
+                model: root.n
 
                 Rectangle {
                     id: markCell
@@ -185,44 +170,40 @@ function genBankFile(row, item) {
                     radius: Theme.paddingSmall / 2
 
                     readonly property int cand: index
-                    readonly property bool isOn: (root.mask & (1 << cand)) !== 0
+                    visible: cand < root.n
+                    readonly property bool isOn: visible && ((root.mask & (1 << cand)) !== 0)
 
-                    color: markCell.isOn
-                           ? Theme.rgba(Theme.highlightColor, 0.40)
-                           : Theme.rgba(Theme.primaryColor, 0.02)
-
+                    // Visual: dim if eliminated
+                    color: markCell.isOn ? Theme.rgba(Theme.highlightColor, 0.20)
+                                         : Theme.rgba(Theme.primaryColor, 0.02)
                     border.width: 1
-                    border.color: Theme.rgba(Theme.primaryColor, 0.35)
+                    border.color: Theme.rgba(Theme.primaryColor, 0.30)
 
+                    // Candidate icon
+                    Image {
+                        anchors.centerIn: parent
+                        width: parent.width * 0.9
+                        height: width
+                        fillMode: Image.PreserveAspectFit
+                        smooth: false
+                        cache: true
+                        asynchronous: true
+
+                        source: Qt.resolvedUrl("../assets/generated_icons/" + (use16px ? "icons_16x16/" : "icons_32x32/")
+                                              + genBankFile(root.rowIndex, markCell.cand) + "?e=" + sherlockEngine.iconEpoch)
+
+                        visible: markCell.isOn
+                    }
+
+                    // Input layer
                     BackgroundItem {
                         anchors.fill: parent
                         highlightedColor: "transparent"
                         enabled: !root.fixed && !sherlockEngine.solved
 
-Image {
-    anchors.centerIn: parent
-    width: parent.width
-    height: width
-    fillMode: Image.PreserveAspectFit
-source: "file:///usr/share/harbour-sherlock/qml/assets/generated_icons/icons_32x32/"
-        + genBankFile(root.rowIndex, markCell.cand)
-        + ".png?e=" + sherlockEngine.size
-    opacity: 1//markCell.present ? 1.0 : 0.5
-}
-
-
                         onClicked: {
-                            // If not certain yet -> toggle normally
-                            if (!root.isCertainCell) {
-                                sherlockEngine.toggleCandidate(root.rowIndex, root.colIndex, markCell.cand)
-                                return
-                            }
-
-                            // If the cell is already certain -> only allow clicking the "on" mark
-                            // so setCertain() can undo/reset (your engine supports this)
-                            if (markCell.isOn) {
-                                sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
-                            }
+                            // Simple and predictable: always toggle on tap (unless fixed/solved)
+                            sherlockEngine.toggleCandidate(root.rowIndex, root.colIndex, markCell.cand)
                         }
 
                         onPressAndHold: {
@@ -236,9 +217,16 @@ source: "file:///usr/share/harbour-sherlock/qml/assets/generated_icons/icons_32x
     }
 
     function fileNameForCell() {
+//        var rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIndex)
+//        var colNumber = displayItem + 1
+//        var idx2 = (displayOneBasedIndex < 10 ? "0" : "") + displayOneBasedIndex
+//        return idx2 + "_" + rowLetter + colNumber + ".png"
+        var ICON_N = 6
+        var item = certainItem
+        var idx = rowIndex * ICON_N + item + 1
+        var idx2 = (idx < 10 ? "0" : "") + idx
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIndex)
-        var colNumber = displayItem + 1
-        var idx2 = (displayOneBasedIndex < 10 ? "0" : "") + displayOneBasedIndex
+        var colNumber = item + 1
         return idx2 + "_" + rowLetter + colNumber + ".png"
     }
 
