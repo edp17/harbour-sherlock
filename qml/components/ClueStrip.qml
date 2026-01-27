@@ -13,6 +13,7 @@ Item {
     property bool showPosition: true
 
     readonly property int n: sherlockEngine.size
+    readonly property int iconBankN: 6
 
     readonly property int posRow: Number(clue && clue.row !== undefined ? clue.row : 0)
     readonly property int posCol: Number(clue && clue.col !== undefined ? clue.col : 0)
@@ -20,7 +21,7 @@ Item {
     readonly property int iconRow: Number(clue && clue.row !== undefined ? clue.row : 0)
     readonly property int iconItem: Number(clue && clue.item !== undefined ? clue.item : 0)
 
-    readonly property int iconOneBasedIndex: (iconRow * n + iconItem + 1)
+    readonly property int iconOneBasedIndex: (iconRow * iconBankN + iconItem + 1)
 
     readonly property string posText: {
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + posRow)
@@ -34,7 +35,7 @@ Item {
     implicitWidth: row.implicitWidth
 
     function genFileName(row, item) {
-        var idx = row * n + item + 1
+        var idx = row * iconBankN + item + 1
         var idx2 = (idx < 10 ? "0" : "") + idx
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
         var colNumber = item + 1

@@ -20,6 +20,7 @@ Item {
     readonly property bool hinted: sherlockEngine.hasHint && (sherlockEngine.hintCell === (rowIndex * n + colIndex))
 
     readonly property int n: sherlockEngine.size
+    readonly property int iconBankN: 6
     readonly property int mask: {
         var list = sherlockEngine.boardMasks
         var i = rowIndex * n + colIndex
@@ -61,7 +62,7 @@ Item {
     readonly property int displayItem: isCertain ? certainItem : colIndex
 
     // Provider / filename mapping uses row-major index
-    readonly property int displayOneBasedIndex: (rowIndex * n + displayItem + 1)
+    readonly property int displayOneBasedIndex: (rowIndex * iconBankN + displayItem + 1)
 
     // 1..n*n index of the icon to show in the BIG area
     readonly property int displayIconIndex: {
@@ -73,8 +74,8 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: root.hinted ? Theme.rgba("#FFC107", 0.35) : "transparent"
-        border.width: root.conflicted ? 3 : (root.hinted ? 3 : (root.isCertain ? 2 : 1))
-        border.color: root.conflicted ? "#FFC107"
+        border.width: root.conflicted ? 3 : (root.hinted ? 5 : (root.isCertain ? 2 : 1))
+        border.color: root.conflicted ? Theme.errorColor
                               : (root.hinted ? Theme.highlightColor
                                              : (root.isCertain
                                                     ? Theme.rgba(Theme.highlightColor, 0.65)
