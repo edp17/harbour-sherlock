@@ -62,6 +62,26 @@ Page
                 onClicked: sherlockEngine.applyHint()
             }
             MenuItem {
+                text: "Random puzzle"
+                onClicked: sherlockEngine.startRandomPuzzle()
+            }
+            MenuItem {
+                text: "Next bank puzzle"
+                onClicked: sherlockEngine.nextBankPuzzle()
+            }
+            MenuItem {
+                text: "Board size: 4x4"
+                onClicked: sherlockEngine.setBoardSize(4)
+            }
+            MenuItem {
+                text: "Board size: 5x5"
+                onClicked: sherlockEngine.setBoardSize(5)
+            }
+            MenuItem {
+                text: "Board size: 6x6"
+                onClicked: sherlockEngine.setBoardSize(6)
+            }
+            MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
             }

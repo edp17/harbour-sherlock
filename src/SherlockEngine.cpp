@@ -17,7 +17,6 @@ SherlockEngine::SherlockEngine(QObject *parent)
     : QObject(parent)
 {
     loadState();                  // loads m_size + m_iconSource + masks + fixed
-//    generateSolution();    // Ensure we have a solution vector (even if no puzzle yet)
     loadSherlockShiFromDataDir(); // may succeed/fail; does not force iconSource
 
     // If user selected SHI previously but images aren't available, force Generated
@@ -29,6 +28,22 @@ SherlockEngine::SherlockEngine(QObject *parent)
         saveState();
     }
     rebuildClues();
+}
+
+static inline quint32 xorshift32(quint32 &state)
+{
+    if (state == 0) state = 1u;
+    quint32 x = state;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    state = x;
+    return x;
+}
+
+static inline int bounded(quint32 &state, int hiExclusive)
+{
+    return int(xorshift32(state) % quint32(hiExclusive));
 }
 
 QVariantList SherlockEngine::clueGroups() const
@@ -55,6 +70,122 @@ QVariantList SherlockEngine::clueGroups() const
         out.push_back(gm);
     }
     return out;
+}
+
+quint32 SherlockEngine::makeBankSeed(int size, int puzzleId) const
+{
+    // Stable mapping (size, puzzleId) -> seed. Good enough until real bank data exists.
+    // (FNV-1a style mixing)
+    quint32 h = 2166136261u;
+    auto mix = [&](quint32 v) {
+        h ^= v;
+        h *= 16777619u;
+    };
+    mix(quint32(size));
+    mix(quint32(puzzleId));
+    return h;
+}
+
+void SherlockEngine::setBoardSize(int n)
+{
+    setSize(n);
+}
+
+void SherlockEngine::startPuzzleCommon(bool clearProgress)
+{
+    clearConflicts();
+    clearHint();
+
+    // Fresh solution must already be in m_solution
+    rebuildForSize();
+
+    // Clear progress
+    const int cells = m_size * m_size;
+    for (int i = 0; i < cells; ++i) {
+        m_masks[i] = fullMask();
+        m_fixed[i] = 0;
+    }
+
+    const int givens = defaultGivenCount();
+
+    QVector<int> indices;
+    indices.reserve(cells);
+    for (int i = 0; i < cells; ++i) indices.push_back(i);
+
+    // Apply givens (locked cells)
+    quint32 rng = (m_puzzleSeed == 0) ? 1u : m_puzzleSeed;
+
+    // shuffle indices
+    for (int i = cells - 1; i > 0; --i) {
+        const int j = bounded(rng, i + 1);
+        std::swap(indices[i], indices[j]);
+    }
+
+    // Deterministic shuffle indices (so givens are stable for a given seed/id)
+    for (int i = cells - 1; i > 0; --i) {
+        const int j = bounded(rng, i + 1);
+        std::swap(indices[i], indices[j]);
+    }
+
+    for (int k = 0; k < givens && k < indices.size(); ++k) {
+        const int i = indices[k];
+        const int sol = m_solution[i];      // 0..n-1
+        m_masks[i] = bit(sol);
+        m_fixed[i] = 1;
+    }
+
+    // Reset undo/redo stacks for a new puzzle
+    m_undo.clear();
+    m_redo.clear();
+    emit undoRedoChanged();
+
+    rebuildClues();
+    updateSolvedState(false);
+
+    emit puzzleIdentityChanged();
+    emit boardChanged();
+    saveState();
+}
+
+void SherlockEngine::startRandomPuzzle()
+{
+    m_puzzleSource = GeneratedPuzzle;
+    m_puzzleId = -1;
+
+    quint32 s = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
+    if (s == 0) s = 1u;
+    m_puzzleSeed = s;
+
+    generateSolutionFromSeed(m_puzzleSeed);
+    startPuzzleCommon(true);
+
+    emit message(QStringLiteral("Random puzzle started."));
+}
+
+void SherlockEngine::startBankPuzzle(int puzzleId)
+{
+    if (puzzleId < 0) puzzleId = 0;
+
+    m_puzzleSource = Bank;
+    m_puzzleId = puzzleId;
+    m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+
+    generateSolutionFromSeed(m_puzzleSeed);
+    startPuzzleCommon(/*clearProgress*/ true);
+
+    emit message(QStringLiteral("Bank puzzle #%1 started.").arg(m_puzzleId));
+}
+
+void SherlockEngine::nextBankPuzzle()
+{
+    // Placeholder bank size. Replace with real bankCount when you load the DOS set.
+    const int bankCount = 1000;
+
+    int next = m_puzzleId;
+    if (m_puzzleSource != Bank || next < 0) next = 0;
+    else next = (next + 1) % bankCount;
+
+    startBankPuzzle(next);
 }
 
 int SherlockEngine::defaultGivenCount() const
@@ -142,6 +273,20 @@ void SherlockEngine::loadState()
     // Ensure arrays exist for this size
     rebuildForSize();
 
+    const int ps = s.value(QStringLiteral("puzzleSource"), int(GeneratedPuzzle)).toInt();
+    m_puzzleSource = (ps == int(Bank)) ? Bank : GeneratedPuzzle;
+
+    m_puzzleId = s.value(QStringLiteral("puzzleId"), -1).toInt();
+    m_puzzleSeed = quint32(s.value(QStringLiteral("puzzleSeed"), 0u).toUInt());
+
+    if (m_puzzleSource == Bank) {
+        if (m_puzzleId < 0) m_puzzleId = 0;
+        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+    } else {
+        if (m_puzzleSeed == 0) m_puzzleSeed = 1;
+    }
+    generateSolutionFromSeed(m_puzzleSeed);
+
     // 2) Icon source (no setter here; avoid saveState recursion during load)
     const int src = s.value(QStringLiteral("iconSource"), int(Generated)).toInt();
     const IconSource loadedSource = (src == int(Shi)) ? Shi : Generated;
@@ -174,6 +319,8 @@ void SherlockEngine::loadState()
     }
     rebuildClues();
     emit iconSourceChanged();
+    updateSolvedState(false);
+    emit puzzleIdentityChanged();
     ++m_iconEpoch;
     emit imagesChanged();
     emit boardChanged();
@@ -184,6 +331,10 @@ void SherlockEngine::saveState() const
     QSettings s;
     s.setValue(QStringLiteral("size"), m_size);
     s.setValue(QStringLiteral("iconSource"), int(m_iconSource));
+
+    s.setValue(QStringLiteral("puzzleSource"), int(m_puzzleSource));
+    s.setValue(QStringLiteral("puzzleId"), m_puzzleId);
+    s.setValue(QStringLiteral("puzzleSeed"), uint(m_puzzleSeed));
 
     QVariantList outMasks;
     outMasks.reserve(m_masks.size());
@@ -680,102 +831,44 @@ void SherlockEngine::setMask(int row, int col, quint32 m)
 
 void SherlockEngine::newGame()
 {
-
-    // Ensure arrays sized
-    rebuildForSize();
-    m_undo.clear();
-    m_redo.clear();
-    clearHint();
-    emit undoRedoChanged();
-
-    generateSolution();
-
-    // Seed qrand once
-    static bool seeded = false;
-    if (!seeded) {
-        seeded = true;
-        qsrand(uint(QDateTime::currentMSecsSinceEpoch() & 0xffffffff));
-    }
-
-    const int cells = m_size * m_size;
-    QVector<int> positions;
-    positions.reserve(cells);
-    for (int i = 0; i < cells; ++i)
-        positions.push_back(i);
-
-    // Fisher–Yates shuffle with qrand
-    for (int i = positions.size() - 1; i > 0; --i) {
-        const int j = qrand() % (i + 1);
-        qSwap(positions[i], positions[j]);
-    }
-
-    const int givens = qMin(defaultGivenCount(), cells);
-
-    // Mark givens
-    for (int k = 0; k < givens; ++k) {
-        const int i = positions[k];
-        const int v = m_solution[i];           // 0..n-1
-        m_masks[i] = bit(v);                   // certain
-        m_fixed[i] = 1;                        // locked
-    }
-
-    // Others: all candidates, not fixed
-    for (int k = givens; k < cells; ++k) {
-        const int i = positions[k];
-        m_masks[i] = fullMask();
-        m_fixed[i] = 0;
-    }
-
-    rebuildClues();
-
-    updateSolvedState(false);
-    emit boardChanged();
-    saveState();
-    emit message(QStringLiteral("New game started (%1 givens).").arg(givens));
+    startRandomPuzzle();
+    //nextBankPuzzle(); //if prefer bank by default
 }
 
-void SherlockEngine::generateSolution()
+void SherlockEngine::generateSolutionFromSeed(quint32 seed)
 {
+    quint32 rng = (seed == 0) ? 1u : seed;
+
     const int n = m_size;
     const int cells = n * n;
-
     m_solution.resize(cells);
 
-    QVector<int> base;     base.reserve(n);
-    QVector<int> rowShift; rowShift.reserve(n);
-    QVector<int> colPerm;  colPerm.reserve(n);
+    // Base Latin square: value = (r + c) % n
+    QVector<int> base(cells);
+    for (int r = 0; r < n; ++r)
+        for (int c = 0; c < n; ++c)
+            base[r * n + c] = (r + c) % n;
 
-    for (int i = 0; i < n; ++i) {
-        base.push_back(i);
-        rowShift.push_back(i);
-        colPerm.push_back(i);
-    }
+    QVector<int> permSym(n), permRow(n), permCol(n);
+    for (int i = 0; i < n; ++i) { permSym[i] = i; permRow[i] = i; permCol[i] = i; }
 
-    // Seed qrand() once per run (cheap + good enough for this puzzle generator)
-    static bool seeded = false;
-    if (!seeded) {
-        seeded = true;
-        qsrand(uint(QDateTime::currentMSecsSinceEpoch() & 0xffffffff));
-    }
-
-    // Fisher–Yates shuffle using qrand()
-    auto shuffleVec = [](QVector<int> &v) {
+    auto shuffle = [&](QVector<int> &v) {
         for (int i = v.size() - 1; i > 0; --i) {
-            const int j = qrand() % (i + 1);
-            qSwap(v[i], v[j]);
+            const int j = bounded(rng, i + 1);
+            std::swap(v[i], v[j]);
         }
     };
 
-    shuffleVec(base);
-    shuffleVec(rowShift);
-    shuffleVec(colPerm);
+    shuffle(permSym);
+    shuffle(permRow);
+    shuffle(permCol);
 
-    // Latin-square-like mapping
     for (int r = 0; r < n; ++r) {
         for (int c = 0; c < n; ++c) {
-            const int cc = colPerm[c];
-            const int v = base[(cc + rowShift[r]) % n];
-            m_solution[r * n + c] = v; // 0..n-1
+            const int rr = permRow[r];
+            const int cc = permCol[c];
+            const int v = base[rr * n + cc];
+            m_solution[r * n + c] = permSym[v];
         }
     }
 }

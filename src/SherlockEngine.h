@@ -25,6 +25,25 @@ class SherlockEngine : public QObject
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
 
 public:
+    enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
+    Q_ENUM(PuzzleSource)
+
+    Q_PROPERTY(int puzzleSource READ puzzleSource NOTIFY puzzleIdentityChanged)
+    Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
+    Q_PROPERTY(quint32 puzzleSeed READ puzzleSeed NOTIFY puzzleIdentityChanged)
+
+    Q_INVOKABLE int PUZZLE_BANK() const { return int(Bank); }
+    Q_INVOKABLE int PUZZLE_GENERATED() const { return int(GeneratedPuzzle); }
+
+    int puzzleSource() const { return int(m_puzzleSource); }
+    int puzzleId() const { return m_puzzleId; }
+    quint32 puzzleSeed() const { return m_puzzleSeed; }
+
+    Q_INVOKABLE void startRandomPuzzle();
+    Q_INVOKABLE void startBankPuzzle(int puzzleId);
+    Q_INVOKABLE void nextBankPuzzle();
+    Q_INVOKABLE void setBoardSize(int n);   // convenience for QML (wraps setSize)
+
     enum IconSource {
         Generated = 0,
         Shi       = 1
@@ -112,6 +131,7 @@ signals:
     void conflictCellsChanged();
     void solvedChanged();
     void hintChanged();
+    void puzzleIdentityChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -170,8 +190,7 @@ private:
 
     void rebuildClues();   // placeholder generator for now
 
-    // minimal generator (Latin-square-like; good enough for now)
-    void generateSolution();
+    void generateSolutionFromSeed(quint32 seed);
 
     void loadState();
     void saveState() const;
@@ -200,4 +219,11 @@ private:
     int m_hintItem {-1};
 
     void setHint(int cell, int item);
+
+    PuzzleSource m_puzzleSource {GeneratedPuzzle};
+    int m_puzzleId {-1};        // valid when Bank
+    quint32 m_puzzleSeed {0};   // valid when GeneratedPuzzle (or also for Bank stub)
+
+    quint32 makeBankSeed(int size, int puzzleId) const;
+    void startPuzzleCommon(bool clearProgress);
 };
