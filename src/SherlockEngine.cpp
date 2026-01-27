@@ -149,15 +149,15 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
         m_fixed[i] = 1;
     }
 
-    // Propagate constraints from givens (row/column elimination)
-    for (int k = 0; k < givens && k < indices.size(); ++k) {
-        const int i = indices[k];
-        const int r = i / m_size;
-        const int c = i % m_size;
-        const int item = m_solution[i];
-
-        // Do NOT emit or save inside propagateCertain
-        propagateCertain(r, c, item);
+    // Propagate constraints from givens (row/column elimination) — only in assisted mode
+    if (m_autoPropagate) {
+        for (int k = 0; k < givens && k < indices.size(); ++k) {
+            const int i = indices[k];
+            const int r = i / m_size;
+            const int c = i % m_size;
+            const int item = m_solution[i];
+            propagateCertain(r, c, item);
+        }
     }
 
     // Reset undo/redo stacks for a new puzzle
@@ -995,7 +995,7 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
             if (newMask & bit(k)) { chosen = k; break; }
         }
         if (chosen >= 0) {
-            propagateCertain(row, col, chosen);
+            if (m_autoPropagate) propagateCertain(row, col, chosen);
         }
     }
 
@@ -1031,7 +1031,9 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
         for (int k = 0; k < m_size; ++k) {
             if (newMask & bit(k)) { chosen = k; break; }
         }
-        if (chosen >= 0) propagateCertain(row, col, chosen);
+        if (chosen >= 0) {
+            if (m_autoPropagate) propagateCertain(row, col, chosen);
+        }
     }
 
     updateSolvedState(true);
@@ -1104,7 +1106,7 @@ void SherlockEngine::setCertain(int row, int col, int item)
     m_masks[i] = b;
 
     // Propagate constraints
-    propagateCertain(row, col, item);
+    if (m_autoPropagate) propagateCertain(row, col, item);
 
     // Single notification + persistence
     emit boardChanged();

@@ -166,6 +166,7 @@ private:
     bool m_solved {false};
     void updateSolvedState(bool announce);
     bool isSolvedNow() const;
+    bool m_autoPropagate {false};   // v1.0: classic marking only (no auto elimination)
 
     int m_size {6};
     QVector<quint32> m_masks;
