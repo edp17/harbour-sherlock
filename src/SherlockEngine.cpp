@@ -88,7 +88,28 @@ quint32 SherlockEngine::makeBankSeed(int size, int puzzleId) const
 
 void SherlockEngine::setBoardSize(int n)
 {
+    if (n != 4 && n != 5 && n != 6) return;
+    if (n == m_size) return;
+
+    // Update size first
     setSize(n);
+
+    // Rebuild puzzle identity deterministically for the new size,
+    // then start the puzzle so clues + givens are regenerated.
+    if (m_puzzleSource == Bank) {
+        if (m_puzzleId < 0) m_puzzleId = 0;
+        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+    } else {
+        if (m_puzzleSeed == 0) {
+            quint32 s = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
+            if (s == 0) s = 1u;
+            m_puzzleSeed = s;
+        }
+        // keep existing seed so size change is deterministic for this generated puzzle
+    }
+
+    generateSolutionFromSeed(m_puzzleSeed);
+    startPuzzleCommon(true);
 }
 
 void SherlockEngine::startPuzzleCommon(bool clearProgress)
@@ -114,12 +135,6 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
 
     // Apply givens (locked cells)
     quint32 rng = (m_puzzleSeed == 0) ? 1u : m_puzzleSeed;
-
-    // shuffle indices
-    for (int i = cells - 1; i > 0; --i) {
-        const int j = bounded(rng, i + 1);
-        std::swap(indices[i], indices[j]);
-    }
 
     // Deterministic shuffle indices (so givens are stable for a given seed/id)
     for (int i = cells - 1; i > 0; --i) {

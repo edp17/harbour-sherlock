@@ -24,13 +24,13 @@ class SherlockEngine : public QObject
     Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
 
-public:
-    enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
-    Q_ENUM(PuzzleSource)
-
     Q_PROPERTY(int puzzleSource READ puzzleSource NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(quint32 puzzleSeed READ puzzleSeed NOTIFY puzzleIdentityChanged)
+
+public:
+    enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
+    Q_ENUM(PuzzleSource)
 
     Q_INVOKABLE int PUZZLE_BANK() const { return int(Bank); }
     Q_INVOKABLE int PUZZLE_GENERATED() const { return int(GeneratedPuzzle); }

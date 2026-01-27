@@ -130,6 +130,16 @@ Page
             PageHeader { title: "Sherlock" }
 
             Label {
+                x: Theme.horizontalPageMargin
+                width: parent.width - 2*x
+                font.pixelSize: Theme.fontSizeExtraSmall
+                color: Theme.secondaryColor
+                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
+                       ? ("Bank #" + sherlockEngine.puzzleId + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
+                       : ("Seed " + sherlockEngine.puzzleSeed + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
+            }
+
+            Label {
                 visible: sherlockEngine.solved
                 x: Theme.horizontalPageMargin
                 width: parent.width - 2*x
