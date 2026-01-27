@@ -98,10 +98,11 @@ Item {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: Theme.paddingSmall
+        anchors.bottom: marksArea.top
+        anchors.bottomMargin: Theme.paddingSmall
 
         // IMPORTANT: keep icon inside the area ABOVE the marks
         width: Math.floor(parent.width * 0.82)
-        height: Math.floor((parent.height - marksArea.height - 2*Theme.paddingSmall) * 0.92)
 
         source: (sherlockEngine.iconSource === 0)
                 ? Qt.resolvedUrl("../assets/generated_icons/"
@@ -116,7 +117,6 @@ Item {
         asynchronous: true
         fillMode: Image.PreserveAspectFit
         visible: root.isCertain
-//        opacity: 1
     }
 
     Rectangle {
@@ -144,8 +144,11 @@ Item {
     // Candidate marks overlay (1 row, n columns; fills the tile)
     Item {
         id: marksArea
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
         anchors.margins: 0
+        height: Math.floor(parent.height * 0.42)   
         z: 10
 
         Grid {
@@ -217,10 +220,6 @@ Item {
     }
 
     function fileNameForCell() {
-//        var rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIndex)
-//        var colNumber = displayItem + 1
-//        var idx2 = (displayOneBasedIndex < 10 ? "0" : "") + displayOneBasedIndex
-//        return idx2 + "_" + rowLetter + colNumber + ".png"
         var ICON_N = 6
         var item = certainItem
         var idx = rowIndex * ICON_N + item + 1
