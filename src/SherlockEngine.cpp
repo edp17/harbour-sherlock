@@ -149,6 +149,17 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
         m_fixed[i] = 1;
     }
 
+    // Propagate constraints from givens (row/column elimination)
+    for (int k = 0; k < givens && k < indices.size(); ++k) {
+        const int i = indices[k];
+        const int r = i / m_size;
+        const int c = i % m_size;
+        const int item = m_solution[i];
+
+        // Do NOT emit or save inside propagateCertain
+        propagateCertain(r, c, item);
+    }
+
     // Reset undo/redo stacks for a new puzzle
     m_undo.clear();
     m_redo.clear();
