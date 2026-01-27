@@ -71,6 +71,15 @@ Item {
         return rowIndex * root.n + item + 1
     }
 
+function genBankFile(row, item) {
+    var ICON_N = 6
+    var idx = row * ICON_N + item + 1
+    var idx2 = (idx < 10 ? "0" : "") + idx
+    var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
+    var colNumber = item + 1
+    return idx2 + "_" + rowLetter + colNumber
+}
+
     Rectangle {
         anchors.fill: parent
         color: root.hinted ? Theme.rgba("#FFC107", 0.35) : "transparent"
@@ -106,6 +115,8 @@ Item {
         cache: true
         asynchronous: true
         fillMode: Image.PreserveAspectFit
+        visible: root.isCertain
+        opacity: 1.0
     }
 
     Rectangle {
@@ -136,8 +147,10 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        height: Math.floor(parent.height * 0.36)
-        anchors.margins: Theme.paddingSmall
+//        height: Math.floor(parent.height * 0.36)
+//        anchors.margins: Theme.paddingSmall
+    anchors.top: parent.top
+    anchors.margins: 0
         z: 10
 
         // Slight background so you can clearly see the overlay exists
@@ -155,7 +168,6 @@ Item {
             anchors.centerIn: parent
             columns: Math.ceil(root.n / 2)
             spacing: Theme.paddingSmall
-
             readonly property real cellSize: Math.floor(
                 Math.min(
                     (marksArea.width  - (columns - 1) * spacing) / columns,
@@ -186,6 +198,18 @@ Item {
                         anchors.fill: parent
                         highlightedColor: "transparent"
                         enabled: !root.fixed && !sherlockEngine.solved
+
+Image {
+    anchors.centerIn: parent
+    width: parent.width
+    height: width
+    fillMode: Image.PreserveAspectFit
+source: "file:///usr/share/harbour-sherlock/qml/assets/generated_icons/icons_32x32/"
+        + genBankFile(root.rowIndex, markCell.cand)
+        + ".png?e=" + sherlockEngine.size
+    opacity: 1//markCell.present ? 1.0 : 0.5
+}
+
 
                         onClicked: {
                             // If not certain yet -> toggle normally
