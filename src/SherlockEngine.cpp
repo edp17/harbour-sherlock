@@ -966,11 +966,8 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
 
-    const quint32 m = m_masks[i];
 
-    // If already certain, do not allow pencil toggling here.
-    // (Certainty is handled via setCertain().)
-    if (m != 0 && ((m & (m - 1)) == 0)) return;
+    const quint32 m = m_masks[i];
 
     const quint32 b = bit(item);
     quint32 newMask = (m ^ b);
