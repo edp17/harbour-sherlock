@@ -115,23 +115,34 @@ bool SherlockEngine::ensureBankLoaded(int size)
     QVector<quint32>& vec = bankSeedsForSize(size);
     vec.clear();
 
-    const QString path = QStringLiteral(":/qml/assets/puzzles/bank_%1.txt").arg(size);
-    QFile f(path);
-    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        // If missing, treat as empty bank (still playable via random).
-        *loaded = true;
+    auto loadFromFile = [&](const QString& path) -> bool {
+        QFile f(path);
+        if (!f.open(QIODevice::ReadOnly | QIODevice::Text))
+            return false;
+
+        QTextStream ts(&f);
+        while (!ts.atEnd()) {
+            const QString line = ts.readLine().trimmed();
+            if (line.isEmpty()) continue;
+            bool ok = false;
+            const quint32 seed = line.toUInt(&ok, 10);
+            if (ok && seed != 0u)
+                vec.append(seed);
+        }
         return true;
+    };
+
+    // 1) Installed filesystem path (what you want on device)
+    const QString fsPath = QStringLiteral("/usr/share/harbour-sherlock/qml/assets/puzzles/bank_%1.txt").arg(size);
+    bool ok = loadFromFile(fsPath);
+
+    // 2) Fallback: qrc path (if you ever embed assets into resources)
+    if (!ok) {
+        const QString qrcPath = QStringLiteral(":/qml/assets/puzzles/bank_%1.txt").arg(size);
+        ok = loadFromFile(qrcPath);
     }
 
-    QTextStream ts(&f);
-    while (!ts.atEnd()) {
-        const QString line = ts.readLine().trimmed();
-        if (line.isEmpty()) continue;
-        bool ok = false;
-        const quint32 seed = line.toUInt(&ok, 10);
-        if (ok && seed != 0u) vec.append(seed);
-    }
-
+    // Mark loaded even if missing: empty bank is valid (random still works)
     *loaded = true;
     return true;
 }
@@ -295,12 +306,10 @@ void SherlockEngine::startBankPuzzle(int puzzleId)
     emit message(QStringLiteral("Bank puzzle #%1 started.").arg(m_puzzleId));
 }
 
-int SherlockEngine::bankCount() const
+int SherlockEngine::bankCount()
 {
-    // const function: we can’t call ensureBankLoaded unless it’s marked mutable.
-    // simplest: just return current loaded vector size; UI label can tolerate 0 until next action.
-    const auto& bank = bankSeedsForSize(m_size);
-    return bank.size();
+    ensureBankLoaded(m_size);
+    return bankSeedsForSize(m_size).size();
 }
 
 void SherlockEngine::nextBankPuzzle()

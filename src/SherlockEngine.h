@@ -120,7 +120,7 @@ public:
     enum ClueOrient { Vertical = 0, Horizontal = 1 };
     Q_ENUM(ClueOrient)
 
-    Q_INVOKABLE int bankCount() const;
+    Q_INVOKABLE int bankCount();
 
 signals:
     void sizeChanged();
