@@ -253,22 +253,20 @@ void SherlockEngine::startRandomPuzzle()
     m_puzzleSource = GeneratedPuzzle;
     m_puzzleId = -1;
 
-    quint32 s = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
-    if (s == 0) s = 1u;
-    m_puzzleSeed = s;
+    quint32 seed = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
+    if (seed == 0) seed = 1u;
 
     ensureBankLoaded(m_size);
     int tries = 0;
     while (tries < 20 && isSeedInBank(m_size, seed)) {
-        seed = xorshift32(seed); // or reseed with time again
+        xorshift32(seed);              // xorshift32 takes quint32& so this is correct
         if (seed == 0u) seed = 1u;
         ++tries;
     }
-    m_puzzleSeed = seed;
 
+    m_puzzleSeed = seed;
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(true);
-
     emit message(QStringLiteral("Random puzzle started."));
 }
 
@@ -307,23 +305,18 @@ int SherlockEngine::bankCount() const
 
 void SherlockEngine::nextBankPuzzle()
 {
-
     ensureBankLoaded(m_size);
     const int count = bankSeedsForSize(m_size).size();
-    if (count > 0) {
+
+    if (m_puzzleSource != Bank || m_puzzleId < 0) {
+        m_puzzleId = 0;
+    } else if (count > 0) {
         m_puzzleId = (m_puzzleId + 1) % count;
     } else {
-        m_puzzleId = m_puzzleId + 1; // or keep your previous behavior
+        m_puzzleId = m_puzzleId + 1; // fallback if bank files missing
     }
 
-    // Placeholder bank size. Replace with real bankCount when you load the DOS set.
-    const int bankCount = 1000;
-
-    int next = m_puzzleId;
-    if (m_puzzleSource != Bank || next < 0) next = 0;
-    else next = (next + 1) % bankCount;
-
-    startBankPuzzle(next);
+    startBankPuzzle(m_puzzleId);
 }
 
 int SherlockEngine::defaultGivenCount() const

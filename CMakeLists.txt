@@ -81,3 +81,10 @@ install(DIRECTORY qml/assets/generated_icons/
         PATTERN "*.png"
         PATTERN "*.json"
 )
+
+# Puzzle assets (TXT)
+install(DIRECTORY qml/assets/puzzles/
+        DESTINATION share/${PROJECT_NAME}/qml/assets/puzzles
+        FILES_MATCHING
+        PATTERN "*.txt"
+)
