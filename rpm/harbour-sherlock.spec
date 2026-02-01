@@ -37,3 +37,6 @@ Does not ship original assets; user may import sherlock.shi.
 %{_datadir}/harbour-sherlock/
 %{_datadir}/applications/harbour-sherlock.desktop
 %{_datadir}/icons/hicolor/86x86/apps/harbour-sherlock.png
+%{_datadir}/harbour-sherlock/qml/assets/puzzles/bank_4.txt
+%{_datadir}/harbour-sherlock/qml/assets/puzzles/bank_5.txt
+%{_datadir}/harbour-sherlock/qml/assets/puzzles/bank_6.txt

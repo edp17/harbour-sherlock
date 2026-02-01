@@ -7,6 +7,7 @@
 #include <QVariantList>
 #include <QSettings>
 #include <QDateTime>
+#include <QHash>
 
 class SherlockEngine : public QObject
 {
@@ -119,6 +120,8 @@ public:
     enum ClueOrient { Vertical = 0, Horizontal = 1 };
     Q_ENUM(ClueOrient)
 
+    Q_INVOKABLE int bankCount() const;
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -227,4 +230,18 @@ private:
 
     quint32 makeBankSeed(int size, int puzzleId) const;
     void startPuzzleCommon(bool clearProgress);
+
+    // Bank seeds (loaded from qml/assets/puzzles/bank_{4,5,6}.txt)
+    QVector<quint32> m_bankSeeds4;
+    QVector<quint32> m_bankSeeds5;
+    QVector<quint32> m_bankSeeds6;
+    bool m_bankLoaded4 {false};
+    bool m_bankLoaded5 {false};
+    bool m_bankLoaded6 {false};
+
+    bool ensureBankLoaded(int size);
+    const QVector<quint32>& bankSeedsForSize(int size) const;
+    QVector<quint32>& bankSeedsForSize(int size);
+    int bankCountForSize(int size);
+    bool isSeedInBank(int size, quint32 seed) const;
 };

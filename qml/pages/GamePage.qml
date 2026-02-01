@@ -134,9 +134,14 @@ Page
                 width: parent.width - 2*x
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: Theme.secondaryColor
+//                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
+//                       ? ("Bank #" + sherlockEngine.puzzleId + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
+//                       : ("Seed " + sherlockEngine.puzzleSeed + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
                 text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
-                       ? ("Bank #" + sherlockEngine.puzzleId + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
-                       : ("Seed " + sherlockEngine.puzzleSeed + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
+                       ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
+                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
+                       : ("Seed " + sherlockEngine.puzzleSeed
+                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
             }
 
             Label {

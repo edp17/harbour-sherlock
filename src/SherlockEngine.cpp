@@ -10,6 +10,8 @@
 #include <QSettings>
 #include <QtGlobal>   // qrand/qsrand
 #include <QDateTime>
+#include <QFile>
+#include <QTextStream>
 
 #include "ShiReader.h"
 
@@ -28,6 +30,35 @@ SherlockEngine::SherlockEngine(QObject *parent)
         saveState();
     }
     rebuildClues();
+}
+
+QVector<quint32>& SherlockEngine::bankSeedsForSize(int size)
+{
+    if (size == 4) return m_bankSeeds4;
+    if (size == 5) return m_bankSeeds5;
+    return m_bankSeeds6;
+}
+
+const QVector<quint32>& SherlockEngine::bankSeedsForSize(int size) const
+{
+    if (size == 4) return m_bankSeeds4;
+    if (size == 5) return m_bankSeeds5;
+    return m_bankSeeds6;
+}
+
+int SherlockEngine::bankCountForSize(int size)
+{
+    if (!ensureBankLoaded(size)) return 0;
+    return bankSeedsForSize(size).size();
+}
+
+bool SherlockEngine::isSeedInBank(int size, quint32 seed) const
+{
+    const auto& v = bankSeedsForSize(size);
+    for (quint32 s : v) {
+        if (s == seed) return true;
+    }
+    return false;
 }
 
 static inline quint32 xorshift32(quint32 &state)
@@ -72,6 +103,39 @@ QVariantList SherlockEngine::clueGroups() const
     return out;
 }
 
+bool SherlockEngine::ensureBankLoaded(int size)
+{
+    bool *loaded = nullptr;
+    if (size == 4) loaded = &m_bankLoaded4;
+    else if (size == 5) loaded = &m_bankLoaded5;
+    else loaded = &m_bankLoaded6;
+
+    if (*loaded) return true;
+
+    QVector<quint32>& vec = bankSeedsForSize(size);
+    vec.clear();
+
+    const QString path = QStringLiteral(":/qml/assets/puzzles/bank_%1.txt").arg(size);
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        // If missing, treat as empty bank (still playable via random).
+        *loaded = true;
+        return true;
+    }
+
+    QTextStream ts(&f);
+    while (!ts.atEnd()) {
+        const QString line = ts.readLine().trimmed();
+        if (line.isEmpty()) continue;
+        bool ok = false;
+        const quint32 seed = line.toUInt(&ok, 10);
+        if (ok && seed != 0u) vec.append(seed);
+    }
+
+    *loaded = true;
+    return true;
+}
+
 quint32 SherlockEngine::makeBankSeed(int size, int puzzleId) const
 {
     // Stable mapping (size, puzzleId) -> seed. Good enough until real bank data exists.
@@ -98,7 +162,18 @@ void SherlockEngine::setBoardSize(int n)
     // then start the puzzle so clues + givens are regenerated.
     if (m_puzzleSource == Bank) {
         if (m_puzzleId < 0) m_puzzleId = 0;
-        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+//        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+        ensureBankLoaded(m_size);
+        const auto& bank = bankSeedsForSize(m_size);
+        if (bank.isEmpty()) {
+            // fallback: use old deterministic mapping so bank still works
+            m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+        } else {
+            // clamp id
+            if (m_puzzleId < 0) m_puzzleId = 0;
+            if (m_puzzleId >= bank.size()) m_puzzleId = 0;
+            m_puzzleSeed = bank[m_puzzleId];
+        }
     } else {
         if (m_puzzleSeed == 0) {
             quint32 s = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
@@ -182,6 +257,15 @@ void SherlockEngine::startRandomPuzzle()
     if (s == 0) s = 1u;
     m_puzzleSeed = s;
 
+    ensureBankLoaded(m_size);
+    int tries = 0;
+    while (tries < 20 && isSeedInBank(m_size, seed)) {
+        seed = xorshift32(seed); // or reseed with time again
+        if (seed == 0u) seed = 1u;
+        ++tries;
+    }
+    m_puzzleSeed = seed;
+
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(true);
 
@@ -194,7 +278,18 @@ void SherlockEngine::startBankPuzzle(int puzzleId)
 
     m_puzzleSource = Bank;
     m_puzzleId = puzzleId;
-    m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+//    m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+    ensureBankLoaded(m_size);
+    const auto& bank = bankSeedsForSize(m_size);
+    if (bank.isEmpty()) {
+        // fallback: use old deterministic mapping so bank still works
+        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+    } else {
+        // clamp id
+        if (m_puzzleId < 0) m_puzzleId = 0;
+        if (m_puzzleId >= bank.size()) m_puzzleId = 0;
+        m_puzzleSeed = bank[m_puzzleId];
+    }
 
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(/*clearProgress*/ true);
@@ -202,8 +297,25 @@ void SherlockEngine::startBankPuzzle(int puzzleId)
     emit message(QStringLiteral("Bank puzzle #%1 started.").arg(m_puzzleId));
 }
 
+int SherlockEngine::bankCount() const
+{
+    // const function: we can’t call ensureBankLoaded unless it’s marked mutable.
+    // simplest: just return current loaded vector size; UI label can tolerate 0 until next action.
+    const auto& bank = bankSeedsForSize(m_size);
+    return bank.size();
+}
+
 void SherlockEngine::nextBankPuzzle()
 {
+
+    ensureBankLoaded(m_size);
+    const int count = bankSeedsForSize(m_size).size();
+    if (count > 0) {
+        m_puzzleId = (m_puzzleId + 1) % count;
+    } else {
+        m_puzzleId = m_puzzleId + 1; // or keep your previous behavior
+    }
+
     // Placeholder bank size. Replace with real bankCount when you load the DOS set.
     const int bankCount = 1000;
 
@@ -307,7 +419,18 @@ void SherlockEngine::loadState()
 
     if (m_puzzleSource == Bank) {
         if (m_puzzleId < 0) m_puzzleId = 0;
-        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+//        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+        ensureBankLoaded(m_size);
+        const auto& bank = bankSeedsForSize(m_size);
+        if (bank.isEmpty()) {
+            // fallback: use old deterministic mapping so bank still works
+            m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
+        } else {
+            // clamp id
+            if (m_puzzleId < 0) m_puzzleId = 0;
+            if (m_puzzleId >= bank.size()) m_puzzleId = 0;
+            m_puzzleSeed = bank[m_puzzleId];
+        }
     } else {
         if (m_puzzleSeed == 0) m_puzzleSeed = 1;
     }
