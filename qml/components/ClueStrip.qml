@@ -72,8 +72,16 @@ Item {
             height: iconDisplayPx + Theme.paddingSmall * 2
             radius: Theme.paddingSmall / 2
             color: Theme.rgba(Theme.primaryColor, 0.02)
-            border.width: 1
-            border.color: Theme.rgba(Theme.primaryColor, 0.25)
+            border.width: root.conflicted ? 3
+                       : (root.hinted ? 5
+                       : (root.isCertain ? (root.fixed ? 3 : 2) : 1))
+
+            border.color: root.conflicted ? Theme.errorColor
+                        : (root.hinted ? Theme.highlightColor
+                        : (root.isCertain
+                ? (root.fixed ? Theme.highlightColor
+                              : Theme.rgba(Theme.highlightColor, 0.65))
+                : Theme.rgba(Theme.primaryColor, 0.25)))
 
             anchors.verticalCenter: parent.verticalCenter
 

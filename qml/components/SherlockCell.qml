@@ -135,9 +135,11 @@ Item {
             id: badgeLabel
             anchors.centerIn: parent
             text: (root.certainCand + 1) // 1..n
-            color: Theme.highlightColor // or Theme.primaryColor if you prefer contrast
-            font.pixelSize: Theme.fontSizeSmall
-            font.bold: true
+            color: root.fixed
+                   ? "black"//Theme.rgba(Theme.highlightColor, 0.95)
+                   : "red"//Theme.rgba(Theme.highlightColor, 0.75)
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.bold: true
         }
     }
 
@@ -148,7 +150,7 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 0
-        height: Math.floor(parent.height * 0.42)   
+        height: Math.floor(parent.height * 0.46)
         z: 10
 
         Grid {
@@ -177,10 +179,13 @@ Item {
                     readonly property bool isOn: visible && ((root.mask & (1 << cand)) !== 0)
 
                     // Visual: dim if eliminated
-                    color: markCell.isOn ? Theme.rgba(Theme.highlightColor, 0.20)
-                                         : Theme.rgba(Theme.primaryColor, 0.02)
                     border.width: 1
-                    border.color: Theme.rgba(Theme.primaryColor, 0.30)
+                    color: markCell.isOn
+                           ? Theme.rgba(Theme.highlightColor, 0.18)
+                           : Theme.rgba(Theme.primaryColor, 0.00)
+                    border.color: markCell.isOn
+                           ? Theme.rgba(Theme.primaryColor, 0.30)
+                           : Theme.rgba(Theme.primaryColor, 0.18)
 
                     // Candidate icon
                     Image {
@@ -195,13 +200,15 @@ Item {
                         source: Qt.resolvedUrl("../assets/generated_icons/" + (use16px ? "icons_16x16/" : "icons_32x32/")
                                               + genBankFile(root.rowIndex, markCell.cand) + "?e=" + sherlockEngine.iconEpoch)
 
-                        visible: markCell.isOn
+                        opacity: markCell.isOn ? 1.0 : 0.18
+                        visible: true
+
                     }
 
                     // Input layer
                     BackgroundItem {
                         anchors.fill: parent
-                        highlightedColor: "transparent"
+                        highlightedColor: Theme.rgba(Theme.highlightColor, 0.10)
                         enabled: !root.fixed && !sherlockEngine.solved
 
                         onClicked: {
