@@ -29,6 +29,9 @@ class SherlockEngine : public QObject
     Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(quint32 puzzleSeed READ puzzleSeed NOTIFY puzzleIdentityChanged)
 
+    Q_PROPERTY(int lastTouchedRow READ lastTouchedRow NOTIFY lastTouchedChanged)
+    Q_PROPERTY(int lastTouchedCol READ lastTouchedCol NOTIFY lastTouchedChanged)
+
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
     Q_ENUM(PuzzleSource)
@@ -39,6 +42,8 @@ public:
     int puzzleSource() const { return int(m_puzzleSource); }
     int puzzleId() const { return m_puzzleId; }
     quint32 puzzleSeed() const { return m_puzzleSeed; }
+    int lastTouchedRow() const { return m_lastTouchedRow; }
+    int lastTouchedCol() const { return m_lastTouchedCol; }
 
     Q_INVOKABLE void startRandomPuzzle();
     Q_INVOKABLE void startBankPuzzle(int puzzleId);
@@ -135,6 +140,7 @@ signals:
     void solvedChanged();
     void hintChanged();
     void puzzleIdentityChanged();
+    void lastTouchedChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -170,6 +176,10 @@ private:
     void updateSolvedState(bool announce);
     bool isSolvedNow() const;
     bool m_autoPropagate {false};   // v1.0: classic marking only (no auto elimination)
+
+    int m_lastTouchedRow {-1};
+    int m_lastTouchedCol {-1};
+    void setLastTouched(int row, int col);
 
     int m_size {6};
     QVector<quint32> m_masks;

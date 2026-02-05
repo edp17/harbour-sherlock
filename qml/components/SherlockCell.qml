@@ -18,6 +18,8 @@ Item {
     }
 
     readonly property bool hinted: sherlockEngine.hasHint && (sherlockEngine.hintCell === (rowIndex * n + colIndex))
+    readonly property bool isFocused: (rowIndex === sherlockEngine.lastTouchedRow
+                                     && colIndex === sherlockEngine.lastTouchedCol)
 
     readonly property int n: sherlockEngine.size
     readonly property int iconBankN: 6
@@ -90,6 +92,19 @@ Item {
                                                     ? Theme.rgba(Theme.highlightColor, 0.65)
                                                     : Theme.rgba(Theme.primaryColor, 0.25)))
     }
+
+    // Subtle focus ring for the last interacted cell (helps orientation on small grids)
+    Rectangle {
+        anchors.fill: parent
+        anchors.margins: 2
+        color: "transparent"
+        visible: root.isFocused && !root.conflicted && !root.hinted
+        border.width: 2
+        border.color: Theme.rgba(Theme.highlightColor, 0.45)
+        radius: Theme.paddingSmall / 2
+        z: 5
+    }
+
 
     // Main icon
     Image {

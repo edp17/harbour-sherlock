@@ -77,6 +77,16 @@ static inline int bounded(quint32 &state, int hiExclusive)
     return int(xorshift32(state) % quint32(hiExclusive));
 }
 
+void SherlockEngine::setLastTouched(int row, int col)
+{
+    if (m_lastTouchedRow == row && m_lastTouchedCol == col)
+        return;
+    m_lastTouchedRow = row;
+    m_lastTouchedCol = col;
+    emit lastTouchedChanged();
+}
+
+
 QVariantList SherlockEngine::clueGroups() const
 {
     QVariantList out;
@@ -202,6 +212,7 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
 {
     clearConflicts();
     clearHint();
+    setLastTouched(-1, -1);
 
     // Fresh solution must already be in m_solution
     rebuildForSize();
@@ -1090,6 +1101,7 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
 
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
+    setLastTouched(row, col);
 
 
     const quint32 m = m_masks[i];
@@ -1133,6 +1145,7 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
 
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
+    setLastTouched(row, col);
 
     const quint32 m = m_masks[i];
     const quint32 newMask = (m & ~bit(item));
@@ -1207,6 +1220,7 @@ void SherlockEngine::setCertain(int row, int col, int item)
 
     const int i = idx(row, col);
     if (isFixedIndex(i)) return;
+    setLastTouched(row, col);
 
     const quint32 b = bit(item);
 
