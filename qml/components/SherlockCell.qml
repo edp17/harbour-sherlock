@@ -85,12 +85,15 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: root.hinted ? Theme.rgba("#FFC107", 0.35) : "transparent"
-        border.width: root.conflicted ? 3 : (root.hinted ? 5 : (root.isCertain ? 2 : 1))
+        border.width: root.conflicted ? 3
+                     : (root.hinted ? 5
+                     : (root.isCertain ? (root.fixed ? 3 : 2) : 1))
         border.color: root.conflicted ? Theme.errorColor
-                              : (root.hinted ? Theme.highlightColor
-                                             : (root.isCertain
-                                                    ? Theme.rgba(Theme.highlightColor, 0.65)
-                                                    : Theme.rgba(Theme.primaryColor, 0.25)))
+                    : (root.hinted ? Theme.highlightColor
+                    : (root.isCertain
+                        ? (root.fixed ? Theme.highlightColor
+                                      : Theme.rgba(Theme.highlightColor, 0.65))
+                        : Theme.rgba(Theme.primaryColor, 0.25)))
     }
 
     // Subtle focus ring for the last interacted cell (helps orientation on small grids)
@@ -141,7 +144,9 @@ Item {
         anchors.rightMargin: Theme.paddingSmall
         anchors.topMargin: Theme.paddingSmall
         radius: Theme.paddingSmall
-        color: Theme.rgba(Theme.highlightColor, 0.85)
+        color: root.fixed
+               ? Theme.rgba(Theme.highlightColor, 0.95)
+               : Theme.rgba(Theme.highlightColor, 0.75)
 
         width: badgeLabel.implicitWidth + Theme.paddingSmall * 2
         height: badgeLabel.implicitHeight + Theme.paddingSmall
@@ -150,11 +155,9 @@ Item {
             id: badgeLabel
             anchors.centerIn: parent
             text: (root.certainCand + 1) // 1..n
-            color: root.fixed
-                   ? "black"//Theme.rgba(Theme.highlightColor, 0.95)
-                   : "red"//Theme.rgba(Theme.highlightColor, 0.75)
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.bold: true
+            color: "black"
+            font.pixelSize: Theme.fontSizeSmall
+            font.bold: true
         }
     }
 
