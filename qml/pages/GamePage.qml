@@ -40,6 +40,10 @@ Page
                 onClicked: sherlockEngine.newGame()
             }
             MenuItem {
+                text: "Restart puzzle"
+                onClicked: sherlockEngine.restartCurrentPuzzle()
+            }
+            MenuItem {
                 text: "Undo"
                 enabled: sherlockEngine.canUndo
                 onClicked: sherlockEngine.undo()
@@ -74,6 +78,11 @@ Page
             MenuItem {
                 text: "Next bank puzzle"
                 onClicked: sherlockEngine.nextBankPuzzle()
+            }
+            MenuItem {
+                text: "Previous bank puzzle"
+                enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
+                onClicked: sherlockEngine.previousBankPuzzle()
             }
             MenuItem {
                 text: "Board size: 4x4"

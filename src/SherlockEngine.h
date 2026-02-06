@@ -51,6 +51,8 @@ public:
     Q_INVOKABLE void startRandomPuzzle();
     Q_INVOKABLE void startBankPuzzle(int puzzleId);
     Q_INVOKABLE void nextBankPuzzle();
+    Q_INVOKABLE void previousBankPuzzle();
+    Q_INVOKABLE void restartCurrentPuzzle();
     Q_INVOKABLE void setBoardSize(int n);   // convenience for QML (wraps setSize)
 
     enum IconSource {

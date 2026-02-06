@@ -374,6 +374,49 @@ void SherlockEngine::nextBankPuzzle()
     startBankPuzzle(m_puzzleId);
 }
 
+void SherlockEngine::previousBankPuzzle()
+{
+    if (m_puzzleSource != Bank)
+        return;
+
+    ensureBankLoaded(m_size);
+    const int count = bankSeedsForSize(m_size).size();
+
+    if (m_puzzleId < 0)
+        m_puzzleId = 0;
+
+    if (count > 0) {
+        // wrap backwards
+        m_puzzleId = (m_puzzleId - 1 + count) % count;
+    } else {
+        // fallback when bank files missing: just decrement but clamp at 0
+        m_puzzleId = qMax(0, m_puzzleId - 1);
+    }
+
+    startBankPuzzle(m_puzzleId);
+}
+
+void SherlockEngine::restartCurrentPuzzle()
+{
+    // Re-run the same puzzle identity but clear progress
+    if (m_puzzleSource == Bank) {
+        if (m_puzzleId < 0) m_puzzleId = 0;
+        startBankPuzzle(m_puzzleId);
+    } else {
+        // GeneratedPuzzle: keep the same seed
+        if (m_puzzleSeed == 0u) {
+            quint32 seed = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
+            if (seed == 0u) seed = 1u;
+            m_puzzleSeed = seed;
+        }
+        m_puzzleSource = GeneratedPuzzle;
+        m_puzzleId = -1;
+        generateSolutionFromSeed(m_puzzleSeed);
+        startPuzzleCommon(true);
+        emit message(QStringLiteral("Puzzle restarted."));
+    }
+}
+
 int SherlockEngine::defaultGivenCount() const
 {
     // Feel free to tweak. These give a playable start without making it trivial.
