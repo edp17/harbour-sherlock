@@ -114,6 +114,36 @@ QVariantList SherlockEngine::clueGroups() const
     return out;
 }
 
+
+QVariantList SherlockEngine::dosClueGroups() const
+{
+    QVariantList out;
+    out.reserve(m_dosClueGroups.size());
+
+    for (const auto &g : m_dosClueGroups) {
+        QVariantMap gm;
+        gm["orient"] = g.orient;
+        gm["index"] = g.index;
+
+        QVariantList list;
+        list.reserve(g.clues.size());
+        for (const auto &c : g.clues) {
+            QVariantMap m;
+            m["type"]  = int(c.sem.type);
+            m["a"]     = c.sem.a;
+            m["b"]     = c.sem.b;
+            m["index"] = c.sem.index;
+            m["given"] = c.sem.given;
+            list.push_back(m);
+        }
+
+        gm["clues"] = list;
+        out.push_back(gm);
+    }
+
+    return out;
+}
+
 bool SherlockEngine::ensureBankLoaded(int size)
 {
     bool *loaded = nullptr;
@@ -964,7 +994,77 @@ void SherlockEngine::rebuildClues()
     }
 
     m_clueGroups = groups;
+
+    rebuildDosClues();
+
     emit clueGroupsChanged();
+}
+
+void SherlockEngine::rebuildDosClues()
+{
+    m_dosClueGroups.clear();
+
+    const int n = m_size;
+    const int cells = n * n;
+    if (m_solution.size() != cells) {
+        return;
+    }
+
+    // Always one group per column (Vertical)
+    m_dosClueGroups.reserve(2 * n);
+
+    for (int c = 0; c < n; ++c) {
+        SemClueGroup g;
+        g.orient = int(Vertical);
+        g.index = c;
+        g.clues.reserve(n > 1 ? (n - 1) : 0);
+
+        for (int r = 0; r + 1 < n; ++r) {
+            const int topIdx = (r * n + c);
+            const int botIdx = ((r + 1) * n + c);
+
+            SemClue sc;
+            sc.orient = int(Vertical);
+            sc.index = c;
+            sc.sem.type = ClueType::Above;
+            sc.sem.a = m_solution[topIdx];
+            sc.sem.b = m_solution[botIdx];
+            sc.sem.index = -1;
+            sc.sem.given = true;
+            sc.sem = normalizeClue(sc.sem);
+
+            g.clues.push_back(sc);
+        }
+
+        m_dosClueGroups.push_back(g);
+    }
+
+    // Always one group per row (Horizontal)
+    for (int r = 0; r < n; ++r) {
+        SemClueGroup g;
+        g.orient = int(Horizontal);
+        g.index = r;
+        g.clues.reserve(n > 1 ? (n - 1) : 0);
+
+        for (int c = 0; c + 1 < n; ++c) {
+            const int leftIdx  = (r * n + c);
+            const int rightIdx = (r * n + (c + 1));
+
+            SemClue sc;
+            sc.orient = int(Horizontal);
+            sc.index = r;
+            sc.sem.type = ClueType::LeftOf;
+            sc.sem.a = m_solution[leftIdx];
+            sc.sem.b = m_solution[rightIdx];
+            sc.sem.index = -1;
+            sc.sem.given = true;
+            sc.sem = normalizeClue(sc.sem);
+
+            g.clues.push_back(sc);
+        }
+
+        m_dosClueGroups.push_back(g);
+    }
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const

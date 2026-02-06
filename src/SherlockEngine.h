@@ -25,6 +25,8 @@ class SherlockEngine : public QObject
     int iconEpoch() const { return m_iconEpoch; }
     Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
+    // DOS-authentic semantic clues derived from the solution
+    Q_PROPERTY(QVariantList dosClueGroups READ dosClueGroups NOTIFY cluesChanged) 
 
     Q_PROPERTY(int puzzleSource READ puzzleSource NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
@@ -67,6 +69,7 @@ public:
     QVariantList boardMasks() const;
     QVariantList clues() const;
     QVariantList clueGroups() const;
+    QVariantList dosClueGroups() const; // DOS-authentic semantic clues derived from the solution
     bool hasImportedImages() const { return m_hasImages; }
 
     QString dataDir() const;
@@ -203,7 +206,8 @@ private:
 
     int m_undoLimit {50};
 
-    void rebuildClues();   // placeholder generator for now
+    void rebuildClues();
+    void rebuildDosClues();
 
     void generateSolutionFromSeed(quint32 seed);
 
@@ -228,6 +232,19 @@ private:
     };
 
     QVector<ClueGroup> m_clueGroups;
+
+    // Semantic (DOS-style) clue stream
+    struct SemClue {
+        ClueSemantic sem;
+        int orient = Vertical; // Vertical/Horizontal for grouping
+        int index = 0;         // column or row index
+    };
+    struct SemClueGroup {
+        int orient = Vertical;
+        int index = 0;
+        QVector<SemClue> clues;
+    };
+    QVector<SemClueGroup> m_dosClueGroups;
 
     void pushUndoSnapshot();
     void clearRedo();
@@ -257,4 +274,5 @@ private:
     QVector<quint32>& bankSeedsForSize(int size);
     int bankCountForSize(int size);
     bool isSeedInBank(int size, quint32 seed) const;
+
 };
