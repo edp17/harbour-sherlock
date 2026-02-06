@@ -158,18 +158,6 @@ Page
                 font.bold: true
             }
 
-            Label
-            {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: page.margin
-
-                wrapMode: Text.WordWrap
-                text: sherlockEngine.size + "×" + sherlockEngine.size +
-                      " deduction board. Tap toggles a candidate. Long-press sets a certain candidate.\nImported images: " +
-                      (sherlockEngine.hasImportedImages ? "yes" : "no (placeholders)")
-            }
-
             // --- Docked clue panels (DOS-like layout) ---
             // Board
             Components.SherlockBoard {

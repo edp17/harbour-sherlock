@@ -111,7 +111,7 @@ Item {
         anchors.bottomMargin: Theme.paddingSmall
 
         // IMPORTANT: keep icon inside the area ABOVE the marks
-        width: Math.floor(parent.width * 0.82)
+        width: Math.floor(parent.width * 0.92)
 
         source: (sherlockEngine.iconSource === 0)
                 ? Qt.resolvedUrl("../assets/generated_icons/"
@@ -126,30 +126,6 @@ Item {
         asynchronous: true
         fillMode: Image.PreserveAspectFit
         visible: root.isCertain
-    }
-
-    Rectangle {
-        visible: root.isCertain && root.certainCand >= 0
-        anchors.right: parent.right
-        anchors.top: parent.top
-        anchors.rightMargin: Theme.paddingSmall
-        anchors.topMargin: Theme.paddingSmall
-        radius: Theme.paddingSmall
-        color: root.fixed
-               ? Theme.rgba(Theme.highlightColor, 0.95)
-               : Theme.rgba(Theme.highlightColor, 0.75)
-
-        width: badgeLabel.implicitWidth + Theme.paddingSmall * 2
-        height: badgeLabel.implicitHeight + Theme.paddingSmall
-
-        Label {
-            id: badgeLabel
-            anchors.centerIn: parent
-            text: (root.certainCand + 1) // 1..n
-            color: "black"
-            font.pixelSize: Theme.fontSizeSmall
-            font.bold: true
-        }
     }
 
     // Candidate marks overlay (1 row, n columns; fills the tile)
