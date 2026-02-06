@@ -177,17 +177,18 @@ Page
                 width: parent.width
             }
 
-            SectionHeader { text: "Clues" }
-
-            // Clues under the board (Option B: semantic DOS-style clues)
+            // Clues under the board (Semantic DOS-style clues)
             // Uses sherlockEngine.dosClueGroups (groups: orient/index/clues; clue: type/a/b/index/given)
+            SectionHeader { text: "Clues" }
 
             Column {
                 id: cluePanel
                 width: parent.width
                 spacing: Theme.paddingSmall
 
-                readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.15)
+                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.9)
+                readonly property int clueGap: Theme.paddingSmall
+                readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
 
                 readonly property int iconBankN: 6
 
@@ -245,68 +246,60 @@ Page
                     Row {
                         id: vRow
                         spacing: Theme.paddingSmall
+
                         Repeater {
                             model: sherlockEngine.dosClueGroups
-                            delegate: Item {
-                                height: cluePanel.clueStripH
-                                width: innerRow.width
+                            delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 0)
-                                opacity: visible ? 1.0 : 0.0
+                                width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
+                                height: cluePanel.clueStripH
+                                radius: Theme.paddingSmall
+                                color: Theme.rgba(Theme.primaryColor, 0.06)
+                                border.width: 1
+                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
 
-                                Row {
-                                    id: innerRow
+                                Column {
+                                    anchors.centerIn: parent
                                     spacing: Theme.paddingSmall
-                                    height: cluePanel.clueStripH
 
                                     Repeater {
                                         model: visible ? modelData.clues : []
-                                        delegate: Rectangle {
-                                            height: cluePanel.clueStripH
-                                            width: Theme.itemSizeLarge * 2.2
-                                            radius: Theme.paddingSmall
-                                            color: Theme.rgba(Theme.primaryColor, 0.06)
-                                            border.width: 1
-                                            border.color: Theme.rgba(Theme.primaryColor, 0.12)
+                                        delegate: Row {
+                                            spacing: Theme.paddingSmall
 
-                                            Row {
-                                                anchors.centerIn: parent
-                                                spacing: Theme.paddingSmall
+                                            Image {
+                                                width: cluePanel.iconPx
+                                                height: cluePanel.iconPx
+                                                sourceSize.width: cluePanel.iconPx
+                                                sourceSize.height: cluePanel.iconPx
 
-                                                // Left icon
-                                                Image {
-                                                    width: Theme.iconSizeMedium
-                                                    height: Theme.iconSizeMedium
-                                                    sourceSize.width: width
-                                                    sourceSize.height: height
-                                                    fillMode: Image.PreserveAspectFit
-                                                    smooth: true
-                                                    cache: true
-                                                    asynchronous: true
-                                                    visible: source !== ""
-                                                    source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
-                                                }
+                                                fillMode: Image.PreserveAspectFit
+                                                cache: true
+                                                asynchronous: true
+                                                smooth: true
+                                                visible: source !== ""
+                                                source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
+                                            }
 
-                                                // Up Arrow icon
-                                                Label {
-                                                    text: cluePanel.arrowForType(modelData.type)
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    color: Theme.primaryColor
-                                                    verticalAlignment: Text.AlignVCenter
-                                                }
+                                            Label {
+                                                text: cluePanel.arrowForType(modelData.type)
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.primaryColor
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
 
-                                                // Right icon
-                                                Image {
-                                                    width: Theme.iconSizeMedium
-                                                    height: Theme.iconSizeMedium
-                                                    sourceSize.width: width
-                                                    sourceSize.height: height
-                                                    fillMode: Image.PreserveAspectFit
-                                                    smooth: true
-                                                    cache: true
-                                                    asynchronous: true
-                                                    visible: source !== ""
-                                                    source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
-                                                }
+                                            Image {
+                                                width: cluePanel.iconPx
+                                                height: cluePanel.iconPx
+                                                sourceSize.width: cluePanel.iconPx
+                                                sourceSize.height: cluePanel.iconPx
+
+                                                fillMode: Image.PreserveAspectFit
+                                                cache: true
+                                                asynchronous: true
+                                                smooth: true
+                                                visible: source !== ""
+                                                source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }
                                     }
@@ -314,6 +307,7 @@ Page
                             }
                         }
                     }
+
                 }
 
                 // Bottom: horizontal semantic clues
@@ -331,68 +325,55 @@ Page
 
                         Repeater {
                             model: sherlockEngine.dosClueGroups
-                            delegate: Item {
-                                height: cluePanel.clueStripH
-                                width: innerRow.width
+                            delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 1)
-                                opacity: visible ? 1.0 : 0.0
+                                width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
+                                height: cluePanel.clueStripH
+                                radius: Theme.paddingSmall
+                                color: Theme.rgba(Theme.primaryColor, 0.06)
+                                border.width: 1
+                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
 
-                                Row {
-                                    id: innerRow
-                                    spacing: Theme.paddingSmall
-                                    height: cluePanel.clueStripH
+                                Column {
+                                    anchors.centerIn: parent
+                                    spacing: cluePanel.clueGap
 
                                     Repeater {
                                         model: visible ? modelData.clues : []
-                                        delegate: Rectangle {
-                                            height: cluePanel.clueStripH
-                                            width: Theme.itemSizeLarge * 2.2
-                                            radius: Theme.paddingSmall
-                                            color: Theme.rgba(Theme.primaryColor, 0.06)
-                                            border.width: 1
-                                            border.color: Theme.rgba(Theme.primaryColor, 0.12)
+                                        delegate: Row {
+                                            spacing: cluePanel.clueGap
 
-                                            Row {
-                                                anchors.centerIn: parent
-                                                spacing: Theme.paddingSmall
+                                            Image {
+                                                width: cluePanel.iconPx
+                                                height: cluePanel.iconPx
+                                                sourceSize.width: cluePanel.iconPx
+                                                sourceSize.height: cluePanel.iconPx
+                                                fillMode: Image.PreserveAspectFit
+                                                cache: true
+                                                asynchronous: true
+                                                smooth: true
+                                                visible: source !== ""
+                                                source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
+                                            }
 
-                                                // Left icon
-                                                Image {
-                                                    width: Theme.iconSizeMedium
-                                                    height: Theme.iconSizeMedium
-                                                    sourceSize.width: width
-                                                    sourceSize.height: height
-                                                    fillMode: Image.PreserveAspectFit
-                                                    smooth: true
-                                                    cache: true
-                                                    asynchronous: true
+                                            Label {
+                                                text: cluePanel.arrowForType(modelData.type)   // should be →
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.primaryColor
+                                                verticalAlignment: Text.AlignVCenter
+                                            }
 
-                                                    visible: source !== ""
-                                                    source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
-                                                }
-
-                                                // Left Arrow icon
-                                                Label {
-                                                    text: cluePanel.arrowForType(modelData.type)
-                                                    font.pixelSize: Theme.fontSizeSmall
-                                                    color: Theme.primaryColor
-                                                    verticalAlignment: Text.AlignVCenter
-                                                }
-
-                                                // Right icon
-                                                Image {
-                                                    width: Theme.iconSizeMedium
-                                                    height: Theme.iconSizeMedium
-                                                    sourceSize.width: width
-                                                    sourceSize.height: height
-                                                    fillMode: Image.PreserveAspectFit
-                                                    smooth: true
-                                                    cache: true
-                                                    asynchronous: true
-
-                                                    visible: source !== ""
-                                                    source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
-                                                }
+                                            Image {
+                                                width: cluePanel.iconPx
+                                                height: cluePanel.iconPx
+                                                sourceSize.width: cluePanel.iconPx
+                                                sourceSize.height: cluePanel.iconPx
+                                                fillMode: Image.PreserveAspectFit
+                                                cache: true
+                                                asynchronous: true
+                                                smooth: true
+                                                visible: source !== ""
+                                                source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }
                                     }
