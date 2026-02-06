@@ -182,117 +182,131 @@ Page
 
             SectionHeader { text: "Clues" }
 
-            // --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
-            Column {
-                id: cluePanel
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: page.margin
+// Clues under the board (Option B: semantic DOS-style clues)
+// Uses sherlockEngine.dosClueGroups (groups: orient/index/clues; clue: type/a/b/index/given)
 
+Column {
+    id: cluePanel
+    width: parent.width
+    spacing: Theme.paddingSmall
 
+    readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.15)
 
-                spacing: Theme.paddingMedium
+    function clueText(c, orient) {
+        var t = Number(c.type)
+        var a = Number(c.a) + 1
+        var b = Number(c.b) + 1
+        // ClueType enum (from your C++): 1=LeftOf, 2=Above
+        if (t === 1) return a + " \u2192 " + b      // →
+        if (t === 2) return a + " \u2191 " + b      // ↑
+        return a + " ? " + b
+    }
 
-                // Direct binding: updates automatically when SherlockEngine emits clueGroupsChanged
-                readonly property var groups: sherlockEngine.clueGroups || []
+    // Top: vertical semantic clues
+    Flickable {
+        id: verticalClues
+        width: parent.width
+        height: cluePanel.clueStripH
+        clip: true
+        contentWidth: vRow.width
+        contentHeight: vRow.height
 
-                function vGroup(col) {
-                    return (groups && groups.length > col) ? groups[col] : null
-                }
+        Row {
+            id: vRow
+            spacing: Theme.paddingSmall
 
-                function hGroup(row) {
-                    var i = page.n + row
-                    return (groups && groups.length > i) ? groups[i] : null
-                }
+            Repeater {
+                model: sherlockEngine.dosClueGroups
+                delegate: Item {
+                    height: cluePanel.clueStripH
+                    width: innerRow.width
+                    visible: (Number(modelData.orient) === 0)
+                    opacity: visible ? 1.0 : 0.0
 
-                // --- VERTICAL CLUES (top): n columns aligned under the board ---
-                Column {
-                    width: parent.width
-                    spacing: page.gap
-
-                    Grid {
-                        id: vGrid
-                        width: parent.width
-                        columns: page.n
-                        spacing: page.gap
-
-                        readonly property real colW: Math.floor((width - (columns - 1) * spacing) / columns)
+                    Row {
+                        id: innerRow
+                        spacing: Theme.paddingSmall
+                        height: cluePanel.clueStripH
 
                         Repeater {
-                            model: page.n   // columns 0..n-1
+                            model: visible ? modelData.clues : []
+                            delegate: Rectangle {
+                                height: cluePanel.clueStripH
+                                radius: Theme.paddingSmall
+                                color: Theme.rgba(Theme.primaryColor, 0.06)
+                                border.width: 1
+                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
 
-                            Column {
-                                width: vGrid.colW
-                                spacing: page.gap
-
-                                readonly property var g: cluePanel.vGroup(index)
-
-                                Repeater {
-                                    model: (g && g.clues) ? g.clues : []
-
-                                    Item {
-                                        width: vGrid.colW
-                                        height: clueStrip.implicitHeight
-                                        clip: true
-
-                                        Components.ClueStrip {
-                                            id: clueStrip
-                                            anchors.fill: parent
-                                            clue: modelData
-                                            orient: 0        // vertical
-                                            showArrow: true
-                                            showPosition: false
-                                        }
-                                    }
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: cluePanel.clueText(modelData, 0)
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primaryColor
                                 }
-                            }
-                        }
-                    }
-                }
 
-                // --- HORIZONTAL CLUES (bottom): n rows, each row scrolls horizontally ---
-                Column {
-                    width: parent.width
-                    spacing: page.gap
-
-                    Repeater {
-                        model: page.n       // rows 0..n-1
-
-                        SilicaFlickable {
-                            id: rowScroll
-                            width: parent.width
-                            clip: true
-                            interactive: true
-                            flickableDirection: Flickable.HorizontalFlick
-                            pressDelay: 100
-
-                            readonly property int rowIndex: index
-                            readonly property var g: cluePanel.hGroup(rowIndex)
-
-                            height: rowRow.implicitHeight
-                            contentWidth: rowRow.width
-                            contentHeight: rowRow.implicitHeight
-
-                            Row {
-                                id: rowRow
-                                spacing: page.gap
-
-                                Repeater {
-                                    model: (g && g.clues) ? g.clues : []
-
-                                    Components.ClueStrip {
-                                        clue: modelData
-                                        orient: 1         // horizontal
-                                        showArrow: true
-                                        showPosition: true
-                                    }
-                                }
+                                implicitWidth: Math.max(Theme.itemSizeSmall * 1.6, label.implicitWidth + Theme.paddingLarge)
+                                Label { id: label; visible: false }
                             }
                         }
                     }
                 }
             }
-            // --- end clues panel ---
+        }
+    }
+
+    // Bottom: horizontal semantic clues
+    Flickable {
+        id: horizontalClues
+        width: parent.width
+        height: cluePanel.clueStripH
+        clip: true
+        contentWidth: hRow.width
+        contentHeight: hRow.height
+
+        Row {
+            id: hRow
+            spacing: Theme.paddingSmall
+
+            Repeater {
+                model: sherlockEngine.dosClueGroups
+                delegate: Item {
+                    height: cluePanel.clueStripH
+                    width: innerRow.width
+                    visible: (Number(modelData.orient) === 1)
+                    opacity: visible ? 1.0 : 0.0
+
+                    Row {
+                        id: innerRow
+                        spacing: Theme.paddingSmall
+                        height: cluePanel.clueStripH
+
+                        Repeater {
+                            model: visible ? modelData.clues : []
+                            delegate: Rectangle {
+                                height: cluePanel.clueStripH
+                                radius: Theme.paddingSmall
+                                color: Theme.rgba(Theme.primaryColor, 0.06)
+                                border.width: 1
+                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
+
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: cluePanel.clueText(modelData, 1)
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primaryColor
+                                }
+
+                                implicitWidth: Math.max(Theme.itemSizeSmall * 1.6, label.implicitWidth + Theme.paddingLarge)
+                                Label { id: label; visible: false }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
         }
     }
 
