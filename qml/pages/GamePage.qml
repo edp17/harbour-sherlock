@@ -10,9 +10,15 @@ Page
 
     allowedOrientations: Orientation.All
 
+    // Layout helpers (were accidentally removed in A3 cleanup)
+    readonly property int n: sherlockEngine.size
     readonly property real margin: Theme.horizontalPageMargin
     readonly property real gap: Theme.paddingSmall
-    readonly property int n: sherlockEngine.size
+
+    function showNotification(text) {
+        if (pageStack && pageStack.showNotification)
+            pageStack.showNotification(text)
+    }
 
     Connections {
         target: sherlockEngine
@@ -130,8 +136,9 @@ Page
             PageHeader { title: "Sherlock" }
 
             Label {
-                x: Theme.horizontalPageMargin
-                width: parent.width - 2*x
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: page.margin
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: Theme.secondaryColor
 //                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
@@ -146,8 +153,9 @@ Page
 
             Label {
                 visible: sherlockEngine.solved
-                x: Theme.horizontalPageMargin
-                width: parent.width - 2*x
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: page.margin
                 text: "Solved!"
                 color: Theme.highlightColor
                 font.bold: true
@@ -155,9 +163,11 @@ Page
 
             Label
             {
-                width: parent.width
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: page.margin
+
                 wrapMode: Text.WordWrap
-                x: Theme.horizontalPageMargin
                 text: sherlockEngine.size + "×" + sherlockEngine.size +
                       " deduction board. Tap toggles a candidate. Long-press sets a certain candidate.\nImported images: " +
                       (sherlockEngine.hasImportedImages ? "yes" : "no (placeholders)")
@@ -175,14 +185,12 @@ Page
             // --- Clues panel (DOS-like): vertical groups above, horizontal groups below ---
             Column {
                 id: cluePanel
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.margins: page.margin
 
-                // Align clue area to the same left/right margins as the board grid
-                readonly property real margin: Theme.horizontalPageMargin
-                readonly property real gap: Theme.paddingSmall
-                readonly property int n: sherlockEngine.size
 
-                x: margin
-                width: parent.width - 2 * margin
+
                 spacing: Theme.paddingMedium
 
                 // Direct binding: updates automatically when SherlockEngine emits clueGroupsChanged
@@ -193,7 +201,7 @@ Page
                 }
 
                 function hGroup(row) {
-                    var i = n + row
+                    var i = page.n + row
                     return (groups && groups.length > i) ? groups[i] : null
                 }
 
@@ -205,13 +213,13 @@ Page
                     Grid {
                         id: vGrid
                         width: parent.width
-                        columns: cluePanel.n
+                        columns: page.n
                         spacing: page.gap
 
                         readonly property real colW: Math.floor((width - (columns - 1) * spacing) / columns)
 
                         Repeater {
-                            model: cluePanel.n   // columns 0..n-1
+                            model: page.n   // columns 0..n-1
 
                             Column {
                                 width: vGrid.colW
@@ -248,7 +256,7 @@ Page
                     spacing: page.gap
 
                     Repeater {
-                        model: cluePanel.n       // rows 0..n-1
+                        model: page.n       // rows 0..n-1
 
                         SilicaFlickable {
                             id: rowScroll

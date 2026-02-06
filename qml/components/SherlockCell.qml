@@ -29,7 +29,6 @@ Item {
         if (!list || list.length !== n*n) return (1 << n) - 1
         return Number(list[i])
     }
-    readonly property bool isCertainCell: (mask & (mask - 1)) === 0
     readonly property bool fixed: sherlockEngine.fixedAt(rowIndex, colIndex)
     readonly property int certainCand: {
         if (!isCertain) return -1
@@ -66,16 +65,8 @@ Item {
     // Provider / filename mapping uses row-major index
     readonly property int displayOneBasedIndex: (rowIndex * iconBankN + displayItem + 1)
 
-    // 1..n*n index of the icon to show in the BIG area
-    readonly property int displayIconIndex: {
-        // Map (rowIndex, item) -> 1-based icon id
-        var item = isCertain ? certainItem : colIndex   // choose what you want for non-certain
-        return rowIndex * root.n + item + 1
-    }
-
     function genBankFile(row, item) {
-        var ICON_N = 6
-        var idx = row * ICON_N + item + 1
+        var idx = row * iconBankN + item + 1
         var idx2 = (idx < 10 ? "0" : "") + idx
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
         var colNumber = item + 1
@@ -245,21 +236,11 @@ Item {
     }
 
     function fileNameForCell() {
-        var ICON_N = 6
         var item = certainItem
-        var idx = rowIndex * ICON_N + item + 1
+        var idx = rowIndex * iconBankN + item + 1
         var idx2 = (idx < 10 ? "0" : "") + idx
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIndex)
         var colNumber = item + 1
         return idx2 + "_" + rowLetter + colNumber + ".png"
-    }
-
-    function fileNameForIndex(oneBased) {
-        if (oneBased <= 0) return "00_blank.png"
-        var idx2 = (oneBased < 10 ? "0" : "") + oneBased
-        var r = Math.floor((oneBased - 1) / root.n)
-        var c = (oneBased - 1) % root.n
-        var rowLetter = String.fromCharCode("A".charCodeAt(0) + r)
-        var colNumber = c + 1
     }
 }

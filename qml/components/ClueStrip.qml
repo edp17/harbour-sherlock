@@ -12,7 +12,6 @@ Item {
     property bool showArrow: true
     property bool showPosition: true
 
-    readonly property int n: sherlockEngine.size
     readonly property int iconBankN: 6
 
     readonly property int posRow: Number(clue && clue.row !== undefined ? clue.row : 0)
@@ -50,6 +49,12 @@ Item {
     readonly property string shiIconPath:
         ("image://sherlock/" + (use16px ? "16" : "32") + "/" + iconOneBasedIndex
          + "?e=" + sherlockEngine.iconEpoch)
+    // Semantics flags (Phase A2): type==0 => given/fixed; type!=0 => derived
+    readonly property bool fixed: (clue && clue.type !== undefined) ? (Number(clue.type) === 0) : true
+    readonly property bool isCertain: true
+    readonly property bool hinted: false
+    readonly property bool conflicted: false
+
 
     Rectangle {
         anchors.fill: parent
