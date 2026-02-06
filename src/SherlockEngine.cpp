@@ -1,4 +1,5 @@
 #include "SherlockEngine.h"
+#include "ClueSemantics.h"
 
 #include <QStandardPaths>
 #include <QDir>
@@ -932,6 +933,10 @@ void SherlockEngine::rebuildClues()
         cl.row  = r;               // board row (A..)
         cl.col  = c;               // board col (1..)
         cl.item = maskToItem(m_masks[i]); // icon item (0..n-1)
+
+        cl.sem.type = ClueType::GivenCell;
+        cl.sem.given = true;
+        cl.sem = normalizeClue(cl.sem);
 
         byCol[c].push_back(cl);
         byRow[r].push_back(cl);

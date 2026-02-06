@@ -21,6 +21,7 @@ add_executable(harbour-sherlock
     src/SherlockImageProvider.cpp
     src/ShiReader.h
     src/ShiReader.cpp
+    src/ClueSemantics.cpp
 )
 
 target_include_directories(harbour-sherlock PRIVATE

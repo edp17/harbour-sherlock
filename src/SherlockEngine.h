@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QDateTime>
 #include <QHash>
+#include "ClueSemantics.h"
 
 class SherlockEngine : public QObject
 {
@@ -215,6 +216,8 @@ private:
         int row = 0;
         int col = 0;
         int item = 0;
+        // formal meaning
+        ClueSemantic sem;
     };
 
     QVector<Clue> m_clues;
