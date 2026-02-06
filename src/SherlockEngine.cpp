@@ -1014,6 +1014,32 @@ void SherlockEngine::rebuildDosClues()
         return;
     }
 
+    auto stripRngSeed = [&](int orient, int index) -> quint32 {
+        // Deterministic per puzzle + strip
+        quint32 s = (m_puzzleSeed == 0u) ? 1u : m_puzzleSeed;
+        s ^= (quint32(orient) << 24);
+        s ^= (quint32(index) << 8);
+        if (s == 0u) s = 1u;
+        return s;
+    };
+
+    auto shuffledAdjacencyOrder = [&](int orient, int index, int count) -> QVector<int> {
+        QVector<int> v;
+        v.reserve(count);
+        for (int i = 0; i < count; ++i) v.push_back(i);
+
+        quint32 rng = stripRngSeed(orient, index);
+        for (int i = v.size() - 1; i > 0; --i) {
+            const int j = bounded(rng, i + 1);
+            std::swap(v[i], v[j]);
+        }
+        return v;
+    };
+
+    // For n>=5: drop exactly 1 adjacency clue per strip (keeps it simple but less revealing).
+    const int dropPerStrip = (n >= 5) ? 1 : 0;
+    const int keepPerStrip = qMax(0, (n - 1) - dropPerStrip);
+
     // Always one group per column (Vertical)
     m_dosClueGroups.reserve(2 * n);
 
@@ -1023,7 +1049,10 @@ void SherlockEngine::rebuildDosClues()
         g.index = c;
         g.clues.reserve(n > 1 ? (n - 1) : 0);
 
-        for (int r = 0; r + 1 < n; ++r) {
+        const auto order = shuffledAdjacencyOrder(int(Vertical), c, n - 1);
+        for (int k = 0; k < keepPerStrip && k < order.size(); ++k) {
+            const int r = order[k];
+
             const int topIdx = (r * n + c);
             const int botIdx = ((r + 1) * n + c);
 
@@ -1054,7 +1083,10 @@ void SherlockEngine::rebuildDosClues()
         g.index = r;
         g.clues.reserve(n > 1 ? (n - 1) : 0);
 
-        for (int c = 0; c + 1 < n; ++c) {
+        const auto order = shuffledAdjacencyOrder(int(Horizontal), r, n - 1);
+        for (int k = 0; k < keepPerStrip && k < order.size(); ++k) {
+            const int c = order[k];
+
             const int leftIdx  = (r * n + c);
             const int rightIdx = (r * n + (c + 1));
 
@@ -1071,6 +1103,7 @@ void SherlockEngine::rebuildDosClues()
             sc.aCol = c;
             sc.bRow = r;
             sc.bCol = c + 1;
+
             g.clues.push_back(sc);
         }
 

@@ -186,8 +186,8 @@ Page
                 width: parent.width
                 spacing: Theme.paddingSmall
 
-                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.9)
-                readonly property int clueGap: Theme.paddingSmall
+                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.75)
+                readonly property int clueGap: Math.floor(Theme.paddingSmall * 0.6)
                 readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
 
                 readonly property int iconBankN: 6
@@ -253,14 +253,14 @@ Page
                                 visible: (Number(modelData.orient) === 0)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
                                 height: cluePanel.clueStripH
-                                radius: Theme.paddingSmall
+                                radius: Math.floor(Theme.paddingSmall * 0.6)
                                 color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: 1
+                                border.width: Math.max(1, Math.floor(Theme.paddingSmall * 0.35))
                                 border.color: Theme.rgba(Theme.primaryColor, 0.12)
 
                                 Column {
                                     anchors.centerIn: parent
-                                    spacing: Theme.paddingSmall
+                                    spacing: cluePanel.clueGap
 
                                     Repeater {
                                         model: visible ? modelData.clues : []
@@ -329,9 +329,9 @@ Page
                                 visible: (Number(modelData.orient) === 1)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
                                 height: cluePanel.clueStripH
-                                radius: Theme.paddingSmall
+                                radius: Math.floor(Theme.paddingSmall * 0.6)
                                 color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: 1
+                                border.width: Math.max(1, Math.floor(Theme.paddingSmall * 0.35))
                                 border.color: Theme.rgba(Theme.primaryColor, 0.12)
 
                                 Column {
