@@ -141,9 +141,6 @@ Page
                 anchors.margins: page.margin
                 font.pixelSize: Theme.fontSizeExtraSmall
                 color: Theme.secondaryColor
-//                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
-//                       ? ("Bank #" + sherlockEngine.puzzleId + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
-//                       : ("Seed " + sherlockEngine.puzzleSeed + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
                 text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
                        ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
                           + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
@@ -182,131 +179,229 @@ Page
 
             SectionHeader { text: "Clues" }
 
-// Clues under the board (Option B: semantic DOS-style clues)
-// Uses sherlockEngine.dosClueGroups (groups: orient/index/clues; clue: type/a/b/index/given)
+            // Clues under the board (Option B: semantic DOS-style clues)
+            // Uses sherlockEngine.dosClueGroups (groups: orient/index/clues; clue: type/a/b/index/given)
 
-Column {
-    id: cluePanel
-    width: parent.width
-    spacing: Theme.paddingSmall
+            Column {
+                id: cluePanel
+                width: parent.width
+                spacing: Theme.paddingSmall
 
-    readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.15)
+                readonly property int clueStripH: Math.floor(Theme.itemSizeLarge * 1.15)
 
-    function clueText(c, orient) {
-        var t = Number(c.type)
-        var a = Number(c.a) + 1
-        var b = Number(c.b) + 1
-        // ClueType enum (from your C++): 1=LeftOf, 2=Above
-        if (t === 1) return a + " \u2192 " + b      // →
-        if (t === 2) return a + " \u2191 " + b      // ↑
-        return a + " ? " + b
-    }
+                readonly property int iconBankN: 6
 
-    // Top: vertical semantic clues
-    Flickable {
-        id: verticalClues
-        width: parent.width
-        height: cluePanel.clueStripH
-        clip: true
-        contentWidth: vRow.width
-        contentHeight: vRow.height
+                function genBankFile(row, item) {
+                    var idx = row * iconBankN + item + 1
+                    var idx2 = (idx < 10 ? "0" : "") + idx
+                    var rowLetter = String.fromCharCode("A".charCodeAt(0) + row)
+                    var colNumber = item + 1
+                    return idx2 + "_" + rowLetter + colNumber + ".png"
+                }
 
-        Row {
-            id: vRow
-            spacing: Theme.paddingSmall
+                function genIconFileName(row, item) {
+                    var n = Number(sherlockEngine.size)
+                    var rr = Number(row)
+                    var ii = Number(item)
+                    if (!isFinite(n) || !isFinite(rr) || !isFinite(ii) || n <= 0) return ""
 
-            Repeater {
-                model: sherlockEngine.dosClueGroups
-                delegate: Item {
+                    var idx = rr * n + ii + 1
+                    var idx2 = (idx < 10 ? "0" : "") + idx
+                    var rowLetter = String.fromCharCode("A".charCodeAt(0) + rr)
+                    var colNumber = ii + 1
+                    return idx2 + "_" + rowLetter + colNumber + ".png"
+                }
+
+                function iconSourceFor(row, item) {
+                    var rr = Number(row)
+                    var ii = Number(item)
+                    if (!isFinite(rr) || !isFinite(ii)) return ""
+
+                    if (sherlockEngine.iconSource === 0) {
+                        var fn = genIconFileName(rr, ii)
+                        if (fn === "") return ""
+                        return Qt.resolvedUrl("../assets/generated_icons/icons_32x32/" + fn) + "?e=" + sherlockEngine.iconEpoch
+                    }
+
+                    return "image://sherlock/r" + rr + "_i" + ii + "?e=" + sherlockEngine.iconEpoch
+                }
+
+                function arrowForType(t) {
+                    t = Number(t)
+                    if (t === 1) return "\u2192" // LeftOf
+                    if (t === 2) return "\u2191" // Above
+                    return "?"
+                }
+
+                // Top: vertical semantic clues
+                Flickable {
+                    id: verticalClues
+                    width: parent.width
                     height: cluePanel.clueStripH
-                    width: innerRow.width
-                    visible: (Number(modelData.orient) === 0)
-                    opacity: visible ? 1.0 : 0.0
+                    clip: true
+                    contentWidth: vRow.width
+                    contentHeight: vRow.height
 
                     Row {
-                        id: innerRow
+                        id: vRow
                         spacing: Theme.paddingSmall
-                        height: cluePanel.clueStripH
+                        Repeater {
+                            model: sherlockEngine.dosClueGroups
+                            delegate: Item {
+                                height: cluePanel.clueStripH
+                                width: innerRow.width
+                                visible: (Number(modelData.orient) === 0)
+                                opacity: visible ? 1.0 : 0.0
+
+                                Row {
+                                    id: innerRow
+                                    spacing: Theme.paddingSmall
+                                    height: cluePanel.clueStripH
+
+                                    Repeater {
+                                        model: visible ? modelData.clues : []
+                                        delegate: Rectangle {
+                                            height: cluePanel.clueStripH
+                                            width: Theme.itemSizeLarge * 2.2
+                                            radius: Theme.paddingSmall
+                                            color: Theme.rgba(Theme.primaryColor, 0.06)
+                                            border.width: 1
+                                            border.color: Theme.rgba(Theme.primaryColor, 0.12)
+
+                                            Row {
+                                                anchors.centerIn: parent
+                                                spacing: Theme.paddingSmall
+
+                                                // Left icon
+                                                Image {
+                                                    width: Theme.iconSizeMedium
+                                                    height: Theme.iconSizeMedium
+                                                    sourceSize.width: width
+                                                    sourceSize.height: height
+                                                    fillMode: Image.PreserveAspectFit
+                                                    smooth: true
+                                                    cache: true
+                                                    asynchronous: true
+                                                    visible: source !== ""
+                                                    source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
+                                                }
+
+                                                // Up Arrow icon
+                                                Label {
+                                                    text: cluePanel.arrowForType(modelData.type)
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    color: Theme.primaryColor
+                                                    verticalAlignment: Text.AlignVCenter
+                                                }
+
+                                                // Right icon
+                                                Image {
+                                                    width: Theme.iconSizeMedium
+                                                    height: Theme.iconSizeMedium
+                                                    sourceSize.width: width
+                                                    sourceSize.height: height
+                                                    fillMode: Image.PreserveAspectFit
+                                                    smooth: true
+                                                    cache: true
+                                                    asynchronous: true
+                                                    visible: source !== ""
+                                                    source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Bottom: horizontal semantic clues
+                Flickable {
+                    id: horizontalClues
+                    width: parent.width
+                    height: cluePanel.clueStripH
+                    clip: true
+                    contentWidth: hRow.width
+                    contentHeight: hRow.height
+
+                    Row {
+                        id: hRow
+                        spacing: Theme.paddingSmall
 
                         Repeater {
-                            model: visible ? modelData.clues : []
-                            delegate: Rectangle {
+                            model: sherlockEngine.dosClueGroups
+                            delegate: Item {
                                 height: cluePanel.clueStripH
-                                radius: Theme.paddingSmall
-                                color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: 1
-                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
+                                width: innerRow.width
+                                visible: (Number(modelData.orient) === 1)
+                                opacity: visible ? 1.0 : 0.0
 
-                                Label {
-                                    anchors.centerIn: parent
-                                    text: cluePanel.clueText(modelData, 0)
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.primaryColor
+                                Row {
+                                    id: innerRow
+                                    spacing: Theme.paddingSmall
+                                    height: cluePanel.clueStripH
+
+                                    Repeater {
+                                        model: visible ? modelData.clues : []
+                                        delegate: Rectangle {
+                                            height: cluePanel.clueStripH
+                                            width: Theme.itemSizeLarge * 2.2
+                                            radius: Theme.paddingSmall
+                                            color: Theme.rgba(Theme.primaryColor, 0.06)
+                                            border.width: 1
+                                            border.color: Theme.rgba(Theme.primaryColor, 0.12)
+
+                                            Row {
+                                                anchors.centerIn: parent
+                                                spacing: Theme.paddingSmall
+
+                                                // Left icon
+                                                Image {
+                                                    width: Theme.iconSizeMedium
+                                                    height: Theme.iconSizeMedium
+                                                    sourceSize.width: width
+                                                    sourceSize.height: height
+                                                    fillMode: Image.PreserveAspectFit
+                                                    smooth: true
+                                                    cache: true
+                                                    asynchronous: true
+
+                                                    visible: source !== ""
+                                                    source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
+                                                }
+
+                                                // Left Arrow icon
+                                                Label {
+                                                    text: cluePanel.arrowForType(modelData.type)
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    color: Theme.primaryColor
+                                                    verticalAlignment: Text.AlignVCenter
+                                                }
+
+                                                // Right icon
+                                                Image {
+                                                    width: Theme.iconSizeMedium
+                                                    height: Theme.iconSizeMedium
+                                                    sourceSize.width: width
+                                                    sourceSize.height: height
+                                                    fillMode: Image.PreserveAspectFit
+                                                    smooth: true
+                                                    cache: true
+                                                    asynchronous: true
+
+                                                    visible: source !== ""
+                                                    source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
-
-                                implicitWidth: Math.max(Theme.itemSizeSmall * 1.6, label.implicitWidth + Theme.paddingLarge)
-                                Label { id: label; visible: false }
                             }
                         }
                     }
                 }
             }
-        }
-    }
-
-    // Bottom: horizontal semantic clues
-    Flickable {
-        id: horizontalClues
-        width: parent.width
-        height: cluePanel.clueStripH
-        clip: true
-        contentWidth: hRow.width
-        contentHeight: hRow.height
-
-        Row {
-            id: hRow
-            spacing: Theme.paddingSmall
-
-            Repeater {
-                model: sherlockEngine.dosClueGroups
-                delegate: Item {
-                    height: cluePanel.clueStripH
-                    width: innerRow.width
-                    visible: (Number(modelData.orient) === 1)
-                    opacity: visible ? 1.0 : 0.0
-
-                    Row {
-                        id: innerRow
-                        spacing: Theme.paddingSmall
-                        height: cluePanel.clueStripH
-
-                        Repeater {
-                            model: visible ? modelData.clues : []
-                            delegate: Rectangle {
-                                height: cluePanel.clueStripH
-                                radius: Theme.paddingSmall
-                                color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: 1
-                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
-
-                                Label {
-                                    anchors.centerIn: parent
-                                    text: cluePanel.clueText(modelData, 1)
-                                    font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.primaryColor
-                                }
-
-                                implicitWidth: Math.max(Theme.itemSizeSmall * 1.6, label.implicitWidth + Theme.paddingLarge)
-                                Label { id: label; visible: false }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
         }
     }
 

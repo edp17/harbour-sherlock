@@ -238,6 +238,10 @@ private:
         ClueSemantic sem;
         int orient = Vertical; // Vertical/Horizontal for grouping
         int index = 0;         // column or row index
+        int aRow = 0;
+        int aCol = 0;
+        int bRow = 0;
+        int bCol = 0;
     };
     struct SemClueGroup {
         int orient = Vertical;

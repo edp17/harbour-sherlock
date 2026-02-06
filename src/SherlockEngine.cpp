@@ -134,6 +134,10 @@ QVariantList SherlockEngine::dosClueGroups() const
             m["b"]     = c.sem.b;
             m["index"] = c.sem.index;
             m["given"] = c.sem.given;
+            m["aRow"]  = c.aRow;
+            m["aCol"]  = c.aCol;
+            m["bRow"]  = c.bRow;
+            m["bCol"]  = c.bCol;
             list.push_back(m);
         }
 
@@ -1032,6 +1036,10 @@ void SherlockEngine::rebuildDosClues()
             sc.sem.index = -1;
             sc.sem.given = true;
             sc.sem = normalizeClue(sc.sem);
+            sc.aRow = r;
+            sc.aCol = c;
+            sc.bRow = r + 1;
+            sc.bCol = c;
 
             g.clues.push_back(sc);
         }
@@ -1059,7 +1067,10 @@ void SherlockEngine::rebuildDosClues()
             sc.sem.index = -1;
             sc.sem.given = true;
             sc.sem = normalizeClue(sc.sem);
-
+            sc.aRow = r;
+            sc.aCol = c;
+            sc.bRow = r;
+            sc.bCol = c + 1;
             g.clues.push_back(sc);
         }
 

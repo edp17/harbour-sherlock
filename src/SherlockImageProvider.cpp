@@ -57,6 +57,6 @@ QImage SherlockImageProvider::requestImage(const QString &id, QSize *size, const
 
     QImage img = m_engine->iconFor(row, item, px);
     if (size) *size = img.size();
-qDebug() << "[sherlock provider]" << id << "-> clean" << clean << "row" << row << "item" << item << "px" << px << "img" << img.size();
+//qDebug() << "[sherlock provider]" << id << "-> clean" << clean << "row" << row << "item" << item << "px" << px << "img" << img.size();
     return img;
 }
