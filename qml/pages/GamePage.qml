@@ -231,12 +231,18 @@ Page
                 }
 
                 function genIconFileName(row, item) {
-                    var n = Number(sherlockEngine.size)
+                    // We always reuse the 6×6 generated icon set.
+                    var baseN = 6
+
                     var rr = Number(row)
                     var ii = Number(item)
-                    if (!isFinite(n) || !isFinite(rr) || !isFinite(ii) || n <= 0) return ""
+                    if (!isFinite(rr) || !isFinite(ii)) return ""
 
-                    var idx = rr * n + ii + 1
+                    // Clamp to available icon range (0..5)
+                    rr = Math.max(0, Math.min(baseN - 1, rr))
+                    ii = Math.max(0, Math.min(baseN - 1, ii))
+
+                    var idx = rr * baseN + ii + 1
                     var idx2 = (idx < 10 ? "0" : "") + idx
                     var rowLetter = String.fromCharCode("A".charCodeAt(0) + rr)
                     var colNumber = ii + 1
@@ -248,13 +254,6 @@ Page
                     var ii = Number(item)
                     if (!isFinite(rr) || !isFinite(ii))
                         return ""
-
-                    // IMPORTANT:
-                    // generated_icons/icons_32x32 currently exists only for the 6×6 set.
-                    // For 4×4 and 5×5, always use the provider (works for all sizes).
-                    if (sherlockEngine.size !== 6) {
-                        return "image://sherlock/r" + rr + "_i" + ii + "?e=" + sherlockEngine.iconEpoch
-                    }
 
                     if (sherlockEngine.iconSource === 0) {
                         var fn = genIconFileName(rr, ii)
