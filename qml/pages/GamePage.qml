@@ -3,6 +3,7 @@ import Sailfish.Silica 1.0
 import Sailfish.Pickers 1.0
 
 import "../components" as Components
+import "../"
 
 Page
 {
@@ -15,9 +16,25 @@ Page
     readonly property real margin: Theme.horizontalPageMargin
     readonly property real gap: Theme.paddingSmall
 
+    SettingsStore {
+        id: appSettings
+    }
+
     function showNotification(text) {
         if (pageStack && pageStack.showNotification)
             pageStack.showNotification(text)
+    }
+
+    Connections {
+        target: appSettings
+        onBoardSizeChanged: {
+            sherlockEngine.setSize(appSettings.boardSize)
+            sherlockEngine.startBankPuzzle(0)
+        }
+    }
+
+    Component.onCompleted: {
+        sherlockEngine.setSize(appSettings.boardSize)
     }
 
     Connections {
@@ -83,6 +100,10 @@ Page
                 text: "Previous bank puzzle"
                 enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
                 onClicked: sherlockEngine.previousBankPuzzle()
+            }
+            MenuItem {
+                text: "Settings"
+                onClicked: pageStack.push(Qt.resolvedUrl("SettingsPage.qml"))
             }
             MenuItem {
                 text: "Board size: 4x4"
@@ -225,7 +246,15 @@ Page
                 function iconSourceFor(row, item) {
                     var rr = Number(row)
                     var ii = Number(item)
-                    if (!isFinite(rr) || !isFinite(ii)) return ""
+                    if (!isFinite(rr) || !isFinite(ii))
+                        return ""
+
+                    // IMPORTANT:
+                    // generated_icons/icons_32x32 currently exists only for the 6×6 set.
+                    // For 4×4 and 5×5, always use the provider (works for all sizes).
+                    if (sherlockEngine.size !== 6) {
+                        return "image://sherlock/r" + rr + "_i" + ii + "?e=" + sherlockEngine.iconEpoch
+                    }
 
                     if (sherlockEngine.iconSource === 0) {
                         var fn = genIconFileName(rr, ii)

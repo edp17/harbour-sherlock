@@ -87,7 +87,6 @@ void SherlockEngine::setLastTouched(int row, int col)
     emit lastTouchedChanged();
 }
 
-
 QVariantList SherlockEngine::clueGroups() const
 {
     QVariantList out;

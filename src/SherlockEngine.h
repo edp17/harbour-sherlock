@@ -66,7 +66,6 @@ public:
     explicit SherlockEngine(QObject *parent = nullptr);
 
     int size() const { return m_size; }
-    void setSize(int n);
 
     QVariantList boardMasks() const;
     QVariantList clues() const;
@@ -132,6 +131,7 @@ public:
     Q_ENUM(ClueOrient)
 
     Q_INVOKABLE int bankCount();
+    Q_INVOKABLE void setSize(int n);
 
 signals:
     void sizeChanged();
