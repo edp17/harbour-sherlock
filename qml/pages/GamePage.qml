@@ -186,9 +186,21 @@ Page
                 width: parent.width
                 spacing: Theme.paddingSmall
 
-                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.75)
-                readonly property int clueGap: Math.floor(Theme.paddingSmall * 0.6)
                 readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
+
+                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.70)
+                readonly property int clueGap: Math.max(1, Math.floor(Theme.paddingSmall * 0.45))
+
+                readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
+                readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.20)
+                readonly property color stripBgAlt: Theme.rgba(Theme.primaryColor, 0.02)
+                readonly property color textCol: Theme.primaryColor
+
+// DOS monochrome mode
+//readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.02)
+//readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.35)
+//readonly property color stripBgAlt: Theme.rgba(Theme.primaryColor, 0.00)
+//readonly property color textCol: Theme.primaryColor
 
                 readonly property int iconBankN: 6
 
@@ -245,18 +257,18 @@ Page
 
                     Row {
                         id: vRow
-                        spacing: Theme.paddingSmall
+                        spacing: cluePanel.clueGap
 
                         Repeater {
                             model: sherlockEngine.dosClueGroups
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 0)
-                                width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
+                                width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
                                 height: cluePanel.clueStripH
-                                radius: Math.floor(Theme.paddingSmall * 0.6)
-                                color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: Math.max(1, Math.floor(Theme.paddingSmall * 0.35))
-                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
+                                radius: 0
+                                color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
+                                border.width: 1
+                                border.color: cluePanel.stripBorder
 
                                 Column {
                                     anchors.centerIn: parent
@@ -276,15 +288,17 @@ Page
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
-                                                smooth: true
+                                                smooth: false
+                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
                                             }
 
                                             Label {
                                                 text: cluePanel.arrowForType(modelData.type)
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                color: Theme.primaryColor
+                                                font.pixelSize: Theme.fontSizeTiny
+                                                font.bold: true
+                                                color: cluePanel.textCol
                                                 verticalAlignment: Text.AlignVCenter
                                             }
 
@@ -297,7 +311,8 @@ Page
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
-                                                smooth: true
+                                                smooth: false
+                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
@@ -321,18 +336,18 @@ Page
 
                     Row {
                         id: hRow
-                        spacing: Theme.paddingSmall
+                        spacing: cluePanel.clueGap
 
                         Repeater {
                             model: sherlockEngine.dosClueGroups
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 1)
-                                width: cluePanel.iconPx * 3 + Theme.paddingLarge * 2
+                                width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
                                 height: cluePanel.clueStripH
-                                radius: Math.floor(Theme.paddingSmall * 0.6)
-                                color: Theme.rgba(Theme.primaryColor, 0.06)
-                                border.width: Math.max(1, Math.floor(Theme.paddingSmall * 0.35))
-                                border.color: Theme.rgba(Theme.primaryColor, 0.12)
+                                radius: 0
+                                color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
+                                border.width: 1
+                                border.color: cluePanel.stripBorder
 
                                 Column {
                                     anchors.centerIn: parent
@@ -351,15 +366,17 @@ Page
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
-                                                smooth: true
+                                                smooth: false
+                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
                                             }
 
                                             Label {
                                                 text: cluePanel.arrowForType(modelData.type)   // should be →
-                                                font.pixelSize: Theme.fontSizeSmall
-                                                color: Theme.primaryColor
+                                                font.pixelSize: Theme.fontSizeTiny
+                                                font.bold: true
+                                                color: cluePanel.textCol
                                                 verticalAlignment: Text.AlignVCenter
                                             }
 
@@ -371,7 +388,8 @@ Page
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
-                                                smooth: true
+                                                smooth: false
+                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
