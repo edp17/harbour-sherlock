@@ -1,6 +1,7 @@
 #include "SherlockEngine.h"
 #include "ClueSemantics.h"
 
+#include <sailfishapp.h>
 #include <QStandardPaths>
 #include <QDir>
 #include <QFile>
@@ -13,6 +14,12 @@
 #include <QDateTime>
 #include <QFile>
 #include <QTextStream>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QStandardPaths>
+#include <QDir>
 
 #include "ShiReader.h"
 
@@ -38,6 +45,14 @@ SherlockEngine::SherlockEngine(QObject *parent)
         saveState();
     }
     rebuildClues();
+    loadScoresFromDisk();
+}
+
+QString SherlockEngine::scoresFilePath() const
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dir);
+    return dir + QStringLiteral("/scores.json");
 }
 
 QVector<quint32>& SherlockEngine::bankSeedsForSize(int size)
@@ -83,6 +98,99 @@ static inline quint32 xorshift32(quint32 &state)
 static inline int bounded(quint32 &state, int hiExclusive)
 {
     return int(xorshift32(state) % quint32(hiExclusive));
+}
+
+void SherlockEngine::setPlayerName(const QString &name)
+{
+    m_playerName = name.left(32);
+}
+
+void SherlockEngine::loadScoresFromDisk()
+{
+    m_scores.clear();
+
+    QFile f(scoresFilePath());
+    if (!f.open(QIODevice::ReadOnly)) {
+        emit scoresChanged();
+        return;
+    }
+
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isArray()) {
+        emit scoresChanged();
+        return;
+    }
+
+    const QJsonArray arr = doc.array();
+    for (const QJsonValue &v : arr) {
+        if (v.isObject())
+            m_scores.append(v.toObject().toVariantMap());
+    }
+
+    emit scoresChanged();
+}
+
+void SherlockEngine::saveScoresToDisk() const
+{
+    QJsonArray arr;
+
+    for (const QVariant &v : m_scores) {
+        const QVariantMap m = v.toMap();
+        arr.append(QJsonObject::fromVariantMap(m));
+    }
+
+    QFile f(scoresFilePath());
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        return;
+
+    f.write(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
+void SherlockEngine::clearScores()
+{
+    m_scores.clear();
+    saveScoresToDisk();
+    emit scoresChanged();
+}
+
+void SherlockEngine::reloadScores()
+{
+    loadScoresFromDisk();
+}
+
+void SherlockEngine::appendScoreIfSolved()
+{
+    // Only record if we truly finished a puzzle.
+    // Use your existing "solved" condition here.
+    if (!m_solved)   // replace with your actual solved flag/property
+        return;
+
+    QVariantMap rec;
+    rec["size"] = m_size;
+    rec["elapsedSeconds"] = m_elapsedSeconds;
+    rec["timestamp"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
+
+    if (m_puzzleSource == Bank) {
+        rec["source"] = "bank";
+        rec["puzzleId"] = m_puzzleId;
+        rec["seed"] = 0;
+    } else {
+        rec["source"] = "random";
+        rec["puzzleId"] = -1;
+        rec["seed"] = int(m_puzzleSeed);
+    }
+
+    // player name comes from QML setting; we’ll pass it in (next section)
+    rec["playerName"] = m_playerName; // if you store it in engine; or set via invokable.
+
+    m_scores.append(rec);
+
+    // Keep file from growing unbounded: keep last 200 entries
+    while (m_scores.size() > 200)
+        m_scores.removeFirst();
+
+    saveScoresToDisk();
+    emit scoresChanged();
 }
 
 void SherlockEngine::timerReset()
@@ -738,6 +846,7 @@ void SherlockEngine::updateSolvedState(bool announce)
 
     if (announce && m_solved) {
         emit message(QStringLiteral("Solved!"));
+        appendScoreIfSolved();
     }
     timerStop();
 }

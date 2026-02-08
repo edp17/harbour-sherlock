@@ -1,10 +1,12 @@
 #pragma once
 
+#include <sailfishapp.h>
 #include <QObject>
 #include <QVector>
 #include <QImage>
 #include <QElapsedTimer>
 #include <QVariantList>
+#include <QString>
 #include <QSettings>
 #include <QDateTime>
 #include <QHash>
@@ -39,6 +41,8 @@ class SherlockEngine : public QObject
     Q_PROPERTY(int elapsedSeconds READ elapsedSeconds NOTIFY elapsedSecondsChanged)
     Q_PROPERTY(bool timerRunning READ timerRunning NOTIFY timerRunningChanged)
 
+    Q_PROPERTY(QVariantList scores READ scores NOTIFY scoresChanged)
+
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
     Q_ENUM(PuzzleSource)
@@ -66,6 +70,13 @@ public:
     Q_INVOKABLE void timerStart();
     Q_INVOKABLE void timerStop();
     Q_INVOKABLE void timerOnUserAction();   // call this from QML on first move
+
+    Q_INVOKABLE void clearScores();
+    Q_INVOKABLE void reloadScores();
+
+    Q_INVOKABLE void setPlayerName(const QString &name);
+
+    QVariantList scores() const { return m_scores; }
 
     enum IconSource {
         Generated = 0,
@@ -162,6 +173,7 @@ signals:
     void dosClueGroupsChanged();
     void elapsedSecondsChanged();
     void timerRunningChanged();
+    void scoresChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -301,4 +313,11 @@ private:
     int bankCountForSize(int size);
     bool isSeedInBank(int size, quint32 seed) const;
 
+    QVariantList m_scores;
+    QString scoresFilePath() const;
+    void loadScoresFromDisk();
+    void saveScoresToDisk() const;
+    void appendScoreIfSolved();
+
+    QString m_playerName;
 };

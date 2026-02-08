@@ -31,9 +31,13 @@ Page
             sherlockEngine.setSize(appSettings.boardSize)
             sherlockEngine.startBankPuzzle(0)
         }
+        onPlayerNameChanged: {
+            sherlockEngine.setPlayerName(appSettings.playerName)
+        }
     }
 
     Component.onCompleted: {
+        sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
     }
 
@@ -105,18 +109,10 @@ Page
                 text: "Settings"
                 onClicked: pageStack.push(Qt.resolvedUrl("SettingsPage.qml"))
             }
-//            MenuItem {
-//                text: "Board size: 4x4"
-//                onClicked: sherlockEngine.setBoardSize(4)
-//            }
-//            MenuItem {
-//                text: "Board size: 5x5"
-//                onClicked: sherlockEngine.setBoardSize(5)
-//            }
-//            MenuItem {
-//                text: "Board size: 6x6"
-//                onClicked: sherlockEngine.setBoardSize(6)
-//            }
+            MenuItem {
+                text: "Scores"
+                onClicked: pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
+            }
             MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
