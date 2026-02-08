@@ -1151,6 +1151,7 @@ void SherlockEngine::rebuildDosClues()
 
         m_dosClueGroups.push_back(g);
     }
+    emit dosClueGroupsChanged();
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const

@@ -26,7 +26,7 @@ class SherlockEngine : public QObject
     Q_PROPERTY(QVariantList clues READ clues NOTIFY cluesChanged)
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
     // DOS-authentic semantic clues derived from the solution
-    Q_PROPERTY(QVariantList dosClueGroups READ dosClueGroups NOTIFY cluesChanged) 
+    Q_PROPERTY(QVariantList dosClueGroups READ dosClueGroups NOTIFY dosClueGroupsChanged)
 
     Q_PROPERTY(int puzzleSource READ puzzleSource NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
@@ -147,6 +147,7 @@ signals:
     void hintChanged();
     void puzzleIdentityChanged();
     void lastTouchedChanged();
+    void dosClueGroupsChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }

@@ -52,9 +52,22 @@ Page
 
         PullDownMenu
         {
+//            MenuItem {
+//                text: "New Game"
+//                onClicked: sherlockEngine.newGame()
+//            }
             MenuItem {
-                text: "New Game"
-                onClicked: sherlockEngine.newGame()
+                text: "Random puzzle"
+                onClicked: sherlockEngine.startRandomPuzzle()
+            }
+            MenuItem {
+                text: "Next bank puzzle"
+                onClicked: sherlockEngine.nextBankPuzzle()
+            }
+            MenuItem {
+                text: "Previous bank puzzle"
+                enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
+                onClicked: sherlockEngine.previousBankPuzzle()
             }
             MenuItem {
                 text: "Restart puzzle"
@@ -89,34 +102,21 @@ Page
                 onClicked: sherlockEngine.applyHint()
             }
             MenuItem {
-                text: "Random puzzle"
-                onClicked: sherlockEngine.startRandomPuzzle()
-            }
-            MenuItem {
-                text: "Next bank puzzle"
-                onClicked: sherlockEngine.nextBankPuzzle()
-            }
-            MenuItem {
-                text: "Previous bank puzzle"
-                enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
-                onClicked: sherlockEngine.previousBankPuzzle()
-            }
-            MenuItem {
                 text: "Settings"
                 onClicked: pageStack.push(Qt.resolvedUrl("SettingsPage.qml"))
             }
-            MenuItem {
-                text: "Board size: 4x4"
-                onClicked: sherlockEngine.setBoardSize(4)
-            }
-            MenuItem {
-                text: "Board size: 5x5"
-                onClicked: sherlockEngine.setBoardSize(5)
-            }
-            MenuItem {
-                text: "Board size: 6x6"
-                onClicked: sherlockEngine.setBoardSize(6)
-            }
+//            MenuItem {
+//                text: "Board size: 4x4"
+//                onClicked: sherlockEngine.setBoardSize(4)
+//            }
+//            MenuItem {
+//                text: "Board size: 5x5"
+//                onClicked: sherlockEngine.setBoardSize(5)
+//            }
+//            MenuItem {
+//                text: "Board size: 6x6"
+//                onClicked: sherlockEngine.setBoardSize(6)
+//            }
             MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
@@ -285,7 +285,8 @@ Page
                         spacing: cluePanel.clueGap
 
                         Repeater {
-                            model: sherlockEngine.dosClueGroups
+//                            model: sherlockEngine.dosClueGroups
+                            model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 0)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
@@ -364,7 +365,8 @@ Page
                         spacing: cluePanel.clueGap
 
                         Repeater {
-                            model: sherlockEngine.dosClueGroups
+//                            model: sherlockEngine.dosClueGroups
+                            model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 1)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
