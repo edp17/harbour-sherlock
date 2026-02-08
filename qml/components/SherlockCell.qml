@@ -197,11 +197,15 @@ Item {
                         enabled: !root.fixed && !sherlockEngine.solved
 
                         onClicked: {
+                            //Start timer on first move
+                            sherlockEngine.timerOnUserAction()
                             // Simple and predictable: always toggle on tap (unless fixed/solved)
                             sherlockEngine.toggleCandidate(root.rowIndex, root.colIndex, markCell.cand)
                         }
 
                         onPressAndHold: {
+                            //Start timer on first move
+                            sherlockEngine.timerOnUserAction()
                             if (!root.fixed && !sherlockEngine.solved)
                                 sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
                         }

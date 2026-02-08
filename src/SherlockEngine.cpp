@@ -19,6 +19,13 @@
 SherlockEngine::SherlockEngine(QObject *parent)
     : QObject(parent)
 {
+    connect(&m_gameTimer, &QTimer::timeout, this, [this]() {
+        ++m_elapsedSeconds;
+        emit elapsedSecondsChanged();
+    });
+    m_gameTimer.setInterval(1000);
+    m_gameTimer.setSingleShot(false);
+
     loadState();                  // loads m_size + m_iconSource + masks + fixed
     loadSherlockShiFromDataDir(); // may succeed/fail; does not force iconSource
 
@@ -76,6 +83,42 @@ static inline quint32 xorshift32(quint32 &state)
 static inline int bounded(quint32 &state, int hiExclusive)
 {
     return int(xorshift32(state) % quint32(hiExclusive));
+}
+
+void SherlockEngine::timerReset()
+{
+    m_gameTimer.stop();
+    m_elapsedSeconds = 0;
+    m_timerRunning = false;
+    m_timerArmed = true;     // allow start on first action
+    emit elapsedSecondsChanged();
+    emit timerRunningChanged();
+}
+
+void SherlockEngine::timerStart()
+{
+    if (m_timerRunning)
+        return;
+    m_timerRunning = true;
+    m_gameTimer.start();
+    emit timerRunningChanged();
+}
+
+void SherlockEngine::timerStop()
+{
+    if (!m_timerRunning)
+        return;
+    m_timerRunning = false;
+    m_gameTimer.stop();
+    emit timerRunningChanged();
+}
+
+void SherlockEngine::timerOnUserAction()
+{
+    if (!m_timerArmed)
+        return;
+    m_timerArmed = false;
+    timerStart();
 }
 
 void SherlockEngine::setLastTouched(int row, int col)
@@ -240,6 +283,7 @@ void SherlockEngine::setBoardSize(int n)
 
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(true);
+    timerReset();
 }
 
 void SherlockEngine::startPuzzleCommon(bool clearProgress)
@@ -323,6 +367,7 @@ void SherlockEngine::startRandomPuzzle()
     m_puzzleSeed = seed;
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(true);
+    timerReset();
     emit message(QStringLiteral("Random puzzle started."));
 }
 
@@ -347,6 +392,7 @@ void SherlockEngine::startBankPuzzle(int puzzleId)
 
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(/*clearProgress*/ true);
+    timerReset();
 
     emit message(QStringLiteral("Bank puzzle #%1 started.").arg(m_puzzleId));
 }
@@ -412,6 +458,7 @@ void SherlockEngine::restartCurrentPuzzle()
         m_puzzleId = -1;
         generateSolutionFromSeed(m_puzzleSeed);
         startPuzzleCommon(true);
+        timerReset();
         emit message(QStringLiteral("Puzzle restarted."));
     }
 }
@@ -692,6 +739,7 @@ void SherlockEngine::updateSolvedState(bool announce)
     if (announce && m_solved) {
         emit message(QStringLiteral("Solved!"));
     }
+    timerStop();
 }
 
 void SherlockEngine::setHint(int cell, int item)

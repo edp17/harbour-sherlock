@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QDateTime>
 #include <QHash>
+#include <QTimer>
 #include "ClueSemantics.h"
 
 class SherlockEngine : public QObject
@@ -35,6 +36,9 @@ class SherlockEngine : public QObject
     Q_PROPERTY(int lastTouchedRow READ lastTouchedRow NOTIFY lastTouchedChanged)
     Q_PROPERTY(int lastTouchedCol READ lastTouchedCol NOTIFY lastTouchedChanged)
 
+    Q_PROPERTY(int elapsedSeconds READ elapsedSeconds NOTIFY elapsedSecondsChanged)
+    Q_PROPERTY(bool timerRunning READ timerRunning NOTIFY timerRunningChanged)
+
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
     Q_ENUM(PuzzleSource)
@@ -48,12 +52,20 @@ public:
     int lastTouchedRow() const { return m_lastTouchedRow; }
     int lastTouchedCol() const { return m_lastTouchedCol; }
 
+    int elapsedSeconds() const { return m_elapsedSeconds; }
+    bool timerRunning() const { return m_timerRunning; }
+
     Q_INVOKABLE void startRandomPuzzle();
     Q_INVOKABLE void startBankPuzzle(int puzzleId);
     Q_INVOKABLE void nextBankPuzzle();
     Q_INVOKABLE void previousBankPuzzle();
     Q_INVOKABLE void restartCurrentPuzzle();
     Q_INVOKABLE void setBoardSize(int n);   // convenience for QML (wraps setSize)
+
+    Q_INVOKABLE void timerReset();
+    Q_INVOKABLE void timerStart();
+    Q_INVOKABLE void timerStop();
+    Q_INVOKABLE void timerOnUserAction();   // call this from QML on first move
 
     enum IconSource {
         Generated = 0,
@@ -148,6 +160,8 @@ signals:
     void puzzleIdentityChanged();
     void lastTouchedChanged();
     void dosClueGroupsChanged();
+    void elapsedSecondsChanged();
+    void timerRunningChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -163,6 +177,11 @@ private:
 
     bool loadSherlockShiFromDataDir();
     void buildPlaceholderIcons();
+
+    QTimer m_gameTimer;
+    int m_elapsedSeconds = 0;
+    bool m_timerRunning = false;
+    bool m_timerArmed = false; // "start on first action" gate
 
 private:
     // --- Undo/Redo snapshot (Step 1: internal) ---

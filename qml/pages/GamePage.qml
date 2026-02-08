@@ -166,6 +166,17 @@ Page
             PageHeader { title: "Sherlock" }
 
             Label {
+                text: {
+                    var s = sherlockEngine.elapsedSeconds
+                    var m = Math.floor(s / 60)
+                    var ss = s % 60
+                    return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
+                }
+                font.pixelSize: Theme.fontSizeSmall
+                color: Theme.primaryColor
+            }
+
+            Label {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.margins: page.margin
