@@ -1,6 +1,6 @@
 Name:       harbour-sherlock
 Version:    0.1.0
-Release:    14
+Release:    15
 Summary:    Sherlock logic deduction puzzle (6x6) for Sailfish OS
 License:    BSD-3-Clause
 Group:      Applications/Games
