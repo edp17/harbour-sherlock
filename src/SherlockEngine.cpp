@@ -716,6 +716,15 @@ void SherlockEngine::resetCell(int row, int col)
     setMask(row, col, fullMask());
 }
 
+void SherlockEngine::setAutoCompleteEnabled(bool on)
+{
+    if (m_autoCompleteEnabled == on) return;
+    m_autoCompleteEnabled = on;
+    emit autoCompleteEnabledChanged();
+    saveState();
+}
+
+
 void SherlockEngine::setIconSource(int v)
 {
     const IconSource ns = (v == int(Shi)) ? Shi : Generated;
@@ -769,7 +778,6 @@ void SherlockEngine::loadState()
 
     if (m_puzzleSource == Bank) {
         if (m_puzzleId < 0) m_puzzleId = 0;
-//        m_puzzleSeed = makeBankSeed(m_size, m_puzzleId);
         ensureBankLoaded(m_size);
         const auto& bank = bankSeedsForSize(m_size);
         if (bank.isEmpty()) {
@@ -790,6 +798,10 @@ void SherlockEngine::loadState()
     const int src = s.value(QStringLiteral("iconSource"), int(Generated)).toInt();
     const IconSource loadedSource = (src == int(Shi)) ? Shi : Generated;
     m_iconSource = loadedSource;
+
+    // Autocomplete
+    m_autoCompleteEnabled = s.value(QStringLiteral("autoCompleteEnabled"), false).toBool();
+    emit autoCompleteEnabledChanged();
 
     // 3) Masks
     const QVariantList savedMasks = s.value(QStringLiteral("masks")).toList();
@@ -830,6 +842,7 @@ void SherlockEngine::saveState() const
     QSettings s;
     s.setValue(QStringLiteral("size"), m_size);
     s.setValue(QStringLiteral("iconSource"), int(m_iconSource));
+    s.setValue(QStringLiteral("autoCompleteEnabled"), m_autoCompleteEnabled);
 
     s.setValue(QStringLiteral("puzzleSource"), int(m_puzzleSource));
     s.setValue(QStringLiteral("puzzleId"), m_puzzleId);
@@ -897,6 +910,108 @@ static inline int maskToItem(quint32 m)
     return -1;
 }
 
+int SherlockEngine::ambiguousCellCount() const
+{
+    const int cells = m_size * m_size;
+    int amb = 0;
+    for (int i = 0; i < cells; ++i) {
+        const quint32 m = m_masks[i];
+        if (m == 0) return cells; // treat as non-trivial
+        if ((m & (m - 1)) != 0) ++amb; // not a singleton
+    }
+    return amb;
+}
+
+bool SherlockEngine::applyHiddenSinglesPass(bool &anyChange)
+{
+    anyChange = false;
+    const int n = m_size;
+    bool changed = false;
+
+    // Hidden singles in rows
+    for (int r = 0; r < n; ++r) {
+        for (int item = 0; item < n; ++item) {
+            const quint32 b = bit(item);
+            int where = -1;
+            int count = 0;
+            for (int c = 0; c < n; ++c) {
+                const int i = r * n + c;
+                if (m_masks[i] & b) {
+                    where = i;
+                    if (++count > 1) break;
+                }
+            }
+            if (count == 1 && where >= 0) {
+                if (m_masks[where] != b) {
+                    m_masks[where] = b;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    // Hidden singles in columns
+    for (int c = 0; c < n; ++c) {
+        for (int item = 0; item < n; ++item) {
+            const quint32 b = bit(item);
+            int where = -1;
+            int count = 0;
+            for (int r = 0; r < n; ++r) {
+                const int i = r * n + c;
+                if (m_masks[i] & b) {
+                    where = i;
+                    if (++count > 1) break;
+                }
+            }
+            if (count == 1 && where >= 0) {
+                if (m_masks[where] != b) {
+                    m_masks[where] = b;
+                    changed = true;
+                }
+            }
+        }
+    }
+
+    anyChange = changed;
+    return true;
+}
+
+bool SherlockEngine::tryAutoCompleteTrivialFinish()
+{
+    // Conservative gate: only attempt if close to solved.
+    // "one number tweak" later: change this threshold.
+    const int amb = ambiguousCellCount();
+    if (amb == 0) return false;
+    if (amb > m_size) return false; // trivial gate (tweak later: amb > 2*m_size is looser
+
+    m_inAutoComplete = true;
+
+    // One undo step for the whole auto-finish.
+    pushUndoSnapshot();
+    clearRedo();
+    clearConflicts();
+    clearHint();
+
+    bool anyOverallChange = false;
+
+    // Repeat forced-only passes until stable.
+    // Bound iterations to avoid pathological loops.
+    for (int it = 0; it < m_size * m_size; ++it) {
+        bool passChanged = false;
+        applyHiddenSinglesPass(passChanged);
+        if (!passChanged) break;
+        anyOverallChange = true;
+    }
+
+    if (anyOverallChange) {
+        emit boardChanged();
+        saveState();
+    }
+
+    m_inAutoComplete = false;
+    return anyOverallChange;
+}
+
 bool SherlockEngine::isSolvedNow() const
 {
     const int n = m_size;
@@ -944,19 +1059,35 @@ bool SherlockEngine::isSolvedNow() const
 void SherlockEngine::updateSolvedState(bool announce)
 {
     const bool nowSolved = isSolvedNow();
-    if (nowSolved == m_solved)
-        return;
-
-    m_solved = nowSolved;
-    emit solvedChanged();
-
-    if (announce && m_solved) {
-        emit message(QStringLiteral("Solved!"));
-        appendScoreIfSolved();
-        markCurrentBankPuzzleSolved();
+    if (nowSolved != m_solved) {
+        m_solved = nowSolved;
+        emit solvedChanged();
+        if (announce && m_solved) {
+            emit message(QStringLiteral("Solved!"));
+            appendScoreIfSolved();
+            markCurrentBankPuzzleSolved();
+            timerStop();
+        }
     }
 
-    timerStop();
+    // Autocomplete "trivial finish" (optional, forced-only, no guessing)
+    // Only run on announced/user-triggered updates (not on load).
+    if (announce && m_autoCompleteEnabled && !m_solved && !m_inAutoComplete) {
+        if (tryAutoCompleteTrivialFinish()) {
+            // After applying, re-check solved state and announce if solved.
+            const bool solvedAfter = isSolvedNow();
+            if (solvedAfter != m_solved) {
+                m_solved = solvedAfter;
+                emit solvedChanged();
+            }
+            if (m_solved) {
+                emit message(QStringLiteral("Solved!"));
+                appendScoreIfSolved();
+                markCurrentBankPuzzleSolved();
+                timerStop();
+            }
+        }
+    }
 }
 
 void SherlockEngine::setHint(int cell, int item)

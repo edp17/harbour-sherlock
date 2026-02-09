@@ -11,6 +11,10 @@ Page {
         id: settings
     }
 
+    Component.onCompleted: {
+        settings.autoCompleteEnabled = sherlockEngine.autoCompleteEnabled
+    }
+
     SilicaFlickable {
         anchors.fill: parent
         contentHeight: column.height
@@ -49,7 +53,11 @@ Page {
             TextSwitch {
                 text: "Enable autocomplete"
                 checked: settings.autoCompleteEnabled
-                onCheckedChanged: settings.autoCompleteEnabled = checked
+
+                onCheckedChanged: {
+                    settings.autoCompleteEnabled = checked
+                    sherlockEngine.setAutoCompleteEnabled(checked)
+                }
             }
         }
     }

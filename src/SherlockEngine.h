@@ -48,6 +48,7 @@ class SherlockEngine : public QObject
     Q_PROPERTY(bool timerRunning READ timerRunning NOTIFY timerRunningChanged)
 
     Q_PROPERTY(QVariantList scores READ scores NOTIFY scoresChanged)
+    Q_PROPERTY(bool autoCompleteEnabled READ autoCompleteEnabled WRITE setAutoCompleteEnabled NOTIFY autoCompleteEnabledChanged)
 
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
@@ -168,6 +169,9 @@ public:
     Q_INVOKABLE void clearSolvedBankPuzzles();            // clears for current size
     Q_INVOKABLE int currentBankPuzzleId() const;
 
+    bool autoCompleteEnabled() const { return m_autoCompleteEnabled; }
+    Q_INVOKABLE void setAutoCompleteEnabled(bool on);
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -187,6 +191,7 @@ signals:
     void timerRunningChanged();
     void scoresChanged();
     void solvedBankChanged();
+    void autoCompleteEnabledChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -339,4 +344,11 @@ private:
     void saveSolvedBankToDisk(int size) const;
     void markCurrentBankPuzzleSolved();
     QSet<int> m_solvedBankIds; // for current m_size only
+
+    int ambiguousCellCount() const;
+    bool applyHiddenSinglesPass(bool &anyChange);
+    bool tryAutoCompleteTrivialFinish();
+
+    bool m_autoCompleteEnabled = false;
+    bool m_inAutoComplete = false;
 };
