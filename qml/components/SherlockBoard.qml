@@ -1,12 +1,17 @@
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
-Item
-{
+Item {
     id: root
 
     // Single source of truth: engine-selected board size
     property int n: sherlockEngine.size
+
+    // Controlled by Settings (GamePage passes it in)
+    property bool magnifierEnabled: false
+
+    // Bubble from cells to GamePage
+    signal magnifyRequested(int row, int col, int focusItem)
 
     // Board padding similar to your other apps
     readonly property real margin: Theme.horizontalPageMargin
@@ -15,8 +20,7 @@ Item
     width: parent ? parent.width : Screen.width
     height: grid.implicitHeight + 2 * margin
 
-    Grid
-    {
+    Grid {
         id: grid
         columns: n
         x: margin
@@ -25,12 +29,10 @@ Item
 
         readonly property real cellSize: Math.floor((root.width - 2*root.margin - (n-1)*root.gap) / n)
 
-        Repeater
-        {
+        Repeater {
             model: n * n
 
-            SherlockCell
-            {
+            SherlockCell {
                 width: grid.cellSize
                 height: grid.cellSize
 
@@ -40,6 +42,10 @@ Item
 
                 rowIndex: row
                 colIndex: col
+
+                magnifierEnabled: root.magnifierEnabled
+
+                onMagnifyRequested: root.magnifyRequested(row, col, focusItem)
             }
         }
     }

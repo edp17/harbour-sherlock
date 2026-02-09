@@ -204,6 +204,15 @@ Page
             Components.SherlockBoard {
                 id: board
                 width: parent.width
+                magnifierEnabled: appSettings.magnifierEnabled
+
+                onMagnifyRequested: {
+                    pageStack.push(Qt.resolvedUrl("MagnifierDialog.qml"), {
+                        row: row,
+                        col: col,
+                        focusItem: focusItem
+                    })
+                }
             }
 
             // Clues under the board (Semantic DOS-style clues)

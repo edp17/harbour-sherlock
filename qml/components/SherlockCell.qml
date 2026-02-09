@@ -7,6 +7,8 @@ Item {
     property int rowIndex: 0
     property int colIndex: 0
     property bool use16px: false
+    property bool magnifierEnabled: false
+    signal magnifyRequested(int row, int col, int focusItem)
     readonly property bool conflicted: {
         var list = sherlockEngine.conflictCells
         if (!list || list.length === 0) return false
@@ -204,11 +206,17 @@ Item {
                         }
 
                         onPressAndHold: {
-                            //Start timer on first move
                             sherlockEngine.timerOnUserAction()
-                            if (!root.fixed && !sherlockEngine.solved)
+                            if (root.fixed || sherlockEngine.solved)
+                                return
+
+                            if (root.magnifierEnabled) {
+                                root.magnifyRequested(root.rowIndex, root.colIndex, markCell.cand)
+                            } else {
                                 sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
+                            }
                         }
+
                     }
                 }
             }
