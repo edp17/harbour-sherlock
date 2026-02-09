@@ -23,6 +23,7 @@
 
 #include "ShiReader.h"
 
+// Constructor
 SherlockEngine::SherlockEngine(QObject *parent)
     : QObject(parent)
 {
@@ -46,6 +47,97 @@ SherlockEngine::SherlockEngine(QObject *parent)
     }
     rebuildClues();
     loadScoresFromDisk();
+    loadSolvedBankFromDisk(m_size);
+}
+
+QString SherlockEngine::solvedBankFilePath(int size) const
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(dir);
+    return dir + QStringLiteral("/solved_bank_%1.json").arg(size);
+}
+
+int SherlockEngine::currentBankPuzzleId() const
+{
+    if (m_puzzleSource != Bank) return -1;
+    return m_puzzleId;
+}
+
+void SherlockEngine::loadSolvedBankFromDisk(int size)
+{
+    m_solvedBankIds.clear();
+
+    QFile f(solvedBankFilePath(size));
+    if (!f.open(QIODevice::ReadOnly)) {
+        emit solvedBankChanged();
+        return;
+    }
+
+    const QJsonDocument doc = QJsonDocument::fromJson(f.readAll());
+    if (!doc.isArray()) {
+        emit solvedBankChanged();
+        return;
+    }
+
+    const QJsonArray arr = doc.array();
+    for (const QJsonValue &v : arr) {
+        if (!v.isDouble()) continue;
+        const int id = v.toInt(-1);
+        if (id >= 0) m_solvedBankIds.insert(id);
+    }
+
+    emit solvedBankChanged();
+}
+
+void SherlockEngine::saveSolvedBankToDisk(int size) const
+{
+    QJsonArray arr;
+    for (int id : m_solvedBankIds) {
+        arr.append(id);
+    }
+
+    QFile f(solvedBankFilePath(size));
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Truncate)) return;
+    f.write(QJsonDocument(arr).toJson(QJsonDocument::Compact));
+}
+
+bool SherlockEngine::bankPuzzleSolved(int puzzleId) const
+{
+    return m_solvedBankIds.contains(puzzleId);
+}
+
+QVariantList SherlockEngine::bankPuzzleEntries() const
+{
+    QVariantList out;
+
+    const int count = const_cast<SherlockEngine*>(this)->bankCount(); // ensures bank is loaded
+    out.reserve(count);
+
+    for (int id = 0; id < count; ++id) {
+        QVariantMap m;
+        m["id"] = id;
+        m["solved"] = m_solvedBankIds.contains(id);
+        out.push_back(m);
+    }
+    return out;
+}
+
+void SherlockEngine::clearSolvedBankPuzzles()
+{
+    m_solvedBankIds.clear();
+    saveSolvedBankToDisk(m_size);
+    emit solvedBankChanged();
+}
+
+void SherlockEngine::markCurrentBankPuzzleSolved()
+{
+    if (m_puzzleSource != Bank) return;
+    if (m_puzzleId < 0) return;
+
+    if (m_solvedBankIds.contains(m_puzzleId)) return;
+    m_solvedBankIds.insert(m_puzzleId);
+    saveSolvedBankToDisk(m_size);
+    emit solvedBankChanged();
 }
 
 QString SherlockEngine::scoresFilePath() const
@@ -461,6 +553,9 @@ void SherlockEngine::startRandomPuzzle()
     m_puzzleSource = GeneratedPuzzle;
     m_puzzleId = -1;
 
+    m_solved = false;
+    emit solvedChanged();
+
     quint32 seed = quint32(QDateTime::currentMSecsSinceEpoch() & 0xffffffffu);
     if (seed == 0) seed = 1u;
 
@@ -482,6 +577,9 @@ void SherlockEngine::startRandomPuzzle()
 void SherlockEngine::startBankPuzzle(int puzzleId)
 {
     if (puzzleId < 0) puzzleId = 0;
+
+    m_solved = false;
+    emit solvedChanged();
 
     m_puzzleSource = Bank;
     m_puzzleId = puzzleId;
@@ -513,6 +611,9 @@ int SherlockEngine::bankCount()
 
 void SherlockEngine::nextBankPuzzle()
 {
+    m_solved = false;
+    emit solvedChanged();
+
     ensureBankLoaded(m_size);
     const int count = bankSeedsForSize(m_size).size();
 
@@ -531,6 +632,9 @@ void SherlockEngine::previousBankPuzzle()
 {
     if (m_puzzleSource != Bank)
         return;
+
+    m_solved = false;
+    emit solvedChanged();
 
     ensureBankLoaded(m_size);
     const int count = bankSeedsForSize(m_size).size();
@@ -594,6 +698,7 @@ void SherlockEngine::setSize(int n)
 
     emit sizeChanged();
     emit boardChanged();   // board dimensions changed, QML should re-render
+    loadSolvedBankFromDisk(m_size);
     emit message(QStringLiteral("Board size set to %1x%1.").arg(m_size));
 }
 
@@ -838,16 +943,19 @@ bool SherlockEngine::isSolvedNow() const
 
 void SherlockEngine::updateSolvedState(bool announce)
 {
-    const bool now = isSolvedNow();
-    if (now == m_solved) return;
+    const bool nowSolved = isSolvedNow();
+    if (nowSolved == m_solved)
+        return;
 
-    m_solved = now;
+    m_solved = nowSolved;
     emit solvedChanged();
 
     if (announce && m_solved) {
         emit message(QStringLiteral("Solved!"));
         appendScoreIfSolved();
+        markCurrentBankPuzzleSolved();
     }
+
     timerStop();
 }
 

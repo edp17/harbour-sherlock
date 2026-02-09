@@ -11,6 +11,12 @@
 #include <QDateTime>
 #include <QHash>
 #include <QTimer>
+#include <QSet>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QStandardPaths>
+#include <QDir>
+#include <QFile>
 #include "ClueSemantics.h"
 
 class SherlockEngine : public QObject
@@ -156,6 +162,12 @@ public:
     Q_INVOKABLE int bankCount();
     Q_INVOKABLE void setSize(int n);
 
+    // Bank puzzle picker + solved persistence
+    Q_INVOKABLE QVariantList bankPuzzleEntries() const;   // [{ id: 0..count-1, solved: bool }, ...]
+    Q_INVOKABLE bool bankPuzzleSolved(int puzzleId) const;
+    Q_INVOKABLE void clearSolvedBankPuzzles();            // clears for current size
+    Q_INVOKABLE int currentBankPuzzleId() const;
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -174,6 +186,7 @@ signals:
     void elapsedSecondsChanged();
     void timerRunningChanged();
     void scoresChanged();
+    void solvedBankChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -320,4 +333,10 @@ private:
     void appendScoreIfSolved();
 
     QString m_playerName;
+
+    QString solvedBankFilePath(int size) const;
+    void loadSolvedBankFromDisk(int size);
+    void saveSolvedBankToDisk(int size) const;
+    void markCurrentBankPuzzleSolved();
+    QSet<int> m_solvedBankIds; // for current m_size only
 };

@@ -65,6 +65,10 @@ Page
                 onClicked: sherlockEngine.startRandomPuzzle()
             }
             MenuItem {
+                text: "Select bank puzzle"
+                onClicked: pageStack.push(Qt.resolvedUrl("PuzzlePickerPage.qml"))
+            }
+            MenuItem {
                 text: "Next bank puzzle"
                 onClicked: sherlockEngine.nextBankPuzzle()
             }
@@ -91,10 +95,10 @@ Page
                 text: "Verify"
                 onClicked: sherlockEngine.verify()
             }
-            MenuItem {
-                text: "Reset Marks"
-                onClicked: sherlockEngine.resetMarks()
-            }
+//            MenuItem {
+//                text: "Reset Marks"
+//                onClicked: sherlockEngine.resetMarks()
+//            }
             MenuItem {
                 text: "Hint"
                 enabled: !sherlockEngine.solved
