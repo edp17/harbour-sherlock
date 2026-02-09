@@ -102,19 +102,20 @@ Item {
     Rectangle {
         id: card
         width: Math.min(parent.width - 2*Theme.horizontalPageMargin, Theme.itemSizeExtraLarge * 5.5)
+        height: content.implicitHeight + 2*Theme.paddingLarge
         radius: Theme.paddingLarge
-        color: Theme.rgba(Theme.highlightDimmerColor, 0.12)
+        color: Theme.rgba(Theme.highlightDimmerColor, 0.92)
         border.width: 2
         border.color: Theme.rgba(Theme.primaryColor, 0.35)
 
         // Swallow clicks inside so outside-tap-close doesn't trigger
         MouseArea { anchors.fill: parent }
-
         Column {
-            width: parent.width
+            id: content
+            width: parent.width - 2*Theme.paddingLarge
+            x: Theme.paddingLarge
+            y: Theme.paddingLarge
             spacing: Theme.paddingLarge
-            anchors.margins: Theme.paddingLarge
-            anchors.fill: parent
 
             Row {
                 width: parent.width
@@ -183,7 +184,7 @@ Item {
                         readonly property int cand: index
                         readonly property bool isOn: ((pop.mask & (1 << cand)) !== 0)
 
-                        color: isOn ? Theme.rgba(Theme.highlightColor, 0.18) : Theme.rgba(Theme.primaryColor, 0.00)
+                        color: isOn ? Theme.rgba(Theme.highlightColor, 0.18) : "transparent"
                         border.width: 1
                         border.color: isOn ? Theme.rgba(Theme.primaryColor, 0.30) : Theme.rgba(Theme.primaryColor, 0.18)
 
@@ -204,13 +205,11 @@ Item {
                             highlightedColor: Theme.rgba(Theme.highlightColor, 0.10)
                             enabled: !sherlockEngine.fixedAt(pop.row, pop.col) && !sherlockEngine.solved
 
-                            // Tap = toggle candidate
                             onClicked: {
                                 sherlockEngine.timerOnUserAction()
                                 sherlockEngine.toggleCandidate(pop.row, pop.col, cand)
                             }
 
-                            // Hold = set certain
                             onPressAndHold: {
                                 sherlockEngine.timerOnUserAction()
                                 sherlockEngine.setCertain(pop.row, pop.col, cand)
@@ -228,8 +227,6 @@ Item {
                     sherlockEngine.resetCell(pop.row, pop.col)
                 }
             }
-
-            Item { width: 1; height: Theme.paddingSmall }
         }
     }
 }
