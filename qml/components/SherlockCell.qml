@@ -8,7 +8,7 @@ Item {
     property int colIndex: 0
     property bool use16px: false
     property bool magnifierEnabled: false
-    signal magnifyRequested(int row, int col, int focusItem)
+    signal magnifyRequested(int row, int col, int focusItem, real gx, real gy, real gw, real gh)
     readonly property bool conflicted: {
         var list = sherlockEngine.conflictCells
         if (!list || list.length === 0) return false
@@ -206,15 +206,16 @@ Item {
                         }
 
                         onPressAndHold: {
+                            if (root.magnifierEnabled && !root.fixed && !sherlockEngine.solved) {
+                                var p = root.mapToItem(null, 0, 0)
+                                sherlockEngine.timerOnUserAction()
+                                root.magnifyRequested(root.rowIndex, root.colIndex, -1, p.x, p.y, root.width, root.height)
+                                return
+                            }
                             sherlockEngine.timerOnUserAction()
                             if (root.fixed || sherlockEngine.solved)
                                 return
 
-                            if (root.magnifierEnabled) {
-                                root.magnifyRequested(root.rowIndex, root.colIndex, markCell.cand)
-                            } else {
-                                sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
-                            }
                         }
 
                     }

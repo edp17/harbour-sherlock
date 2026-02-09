@@ -11,7 +11,7 @@ Item {
     property bool magnifierEnabled: false
 
     // Bubble from cells to GamePage
-    signal magnifyRequested(int row, int col, int focusItem)
+    signal magnifyRequested(int row, int col, int focusItem, real gx, real gy, real gw, real gh)
 
     // Board padding similar to your other apps
     readonly property real margin: Theme.horizontalPageMargin
@@ -45,7 +45,7 @@ Item {
 
                 magnifierEnabled: root.magnifierEnabled
 
-                onMagnifyRequested: root.magnifyRequested(row, col, focusItem)
+                onMagnifyRequested: root.magnifyRequested(row, col, focusItem, gx, gy, gw, gh)
             }
         }
     }

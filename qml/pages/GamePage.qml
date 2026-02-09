@@ -157,6 +157,10 @@ Page
 //            }
         }
 
+        Components.MagnifierPopup {
+            id: magnifierPopup
+        }
+
         Column
         {
             id: column
@@ -207,11 +211,14 @@ Page
                 magnifierEnabled: appSettings.magnifierEnabled
 
                 onMagnifyRequested: {
-                    pageStack.push(Qt.resolvedUrl("MagnifierDialog.qml"), {
-                        row: row,
-                        col: col,
-                        focusItem: focusItem
-                    })
+                    magnifierPopup.row = row
+                    magnifierPopup.col = col
+                    magnifierPopup.focusItem = focusItem
+                    magnifierPopup.gx = gx
+                    magnifierPopup.gy = gy
+                    magnifierPopup.gw = gw
+                    magnifierPopup.gh = gh
+                    magnifierPopup.visible = true
                 }
             }
 
@@ -305,7 +312,6 @@ Page
                         spacing: cluePanel.clueGap
 
                         Repeater {
-//                            model: sherlockEngine.dosClueGroups
                             model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 0)
@@ -385,7 +391,6 @@ Page
                         spacing: cluePanel.clueGap
 
                         Repeater {
-//                            model: sherlockEngine.dosClueGroups
                             model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
                                 visible: (Number(modelData.orient) === 1)
