@@ -130,6 +130,25 @@ Item {
         visible: root.isCertain
     }
 
+    BackgroundItem {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.bottom: marksArea.top
+        highlightedColor: "transparent"
+        enabled: root.magnifierEnabled && !root.fixed && !sherlockEngine.solved
+
+        onPressAndHold: {
+            sherlockEngine.timerOnUserAction()
+            var p = root.mapToItem(null, 0, 0)
+            root.magnifyRequested(root.rowIndex, root.colIndex, -1,
+                                  p.x, p.y, root.width, root.height)
+        }
+
+        // don’t interfere with normal taps (selection/candidate toggles)
+        onClicked: { }
+    }
+
     // Candidate marks overlay (1 row, n columns; fills the tile)
     Item {
         id: marksArea
@@ -206,18 +225,18 @@ Item {
                         }
 
                         onPressAndHold: {
-                            if (root.magnifierEnabled && !root.fixed && !sherlockEngine.solved) {
-                                var p = root.mapToItem(null, 0, 0)
-                                sherlockEngine.timerOnUserAction()
-                                root.magnifyRequested(root.rowIndex, root.colIndex, -1, p.x, p.y, root.width, root.height)
-                                return
-                            }
                             sherlockEngine.timerOnUserAction()
                             if (root.fixed || sherlockEngine.solved)
                                 return
 
+                            if (root.magnifierEnabled) {
+                                var p = root.mapToItem(null, 0, 0)
+                                root.magnifyRequested(root.rowIndex, root.colIndex, markCell.cand,
+                                                      p.x, p.y, root.width, root.height)
+                            } else {
+                                sherlockEngine.setCertain(root.rowIndex, root.colIndex, markCell.cand)
+                            }
                         }
-
                     }
                 }
             }
