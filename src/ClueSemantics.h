@@ -2,18 +2,23 @@
 #include <QString>
 
 enum class ClueType {
-    GivenCell = 0,          // current behavior (fixed/given)
-    // Future DOS-authentic types (Phase B2+):
-    LeftOf,
-    Above,
-    SameRow,
-    SameCol,
-    NotSameRow,
-    NotSameCol,
-    IsInRow,
-    IsInCol,
-    NotInRow,
-    NotInCol
+    GivenCell   = 0,
+
+    // Positional (current)
+    LeftOf      = 1,
+    Above       = 2,
+
+    // Same/Not-same (future)
+    SameRow     = 3,
+    SameCol     = 4,
+    NotSameRow  = 5,
+    NotSameCol  = 6,
+
+    // Direct placement (we’ll use IsInCol now)
+    IsInRow     = 7,
+    IsInCol     = 8,
+    NotInRow    = 9,
+    NotInCol    = 10
 };
 
 struct ClueSemantic {

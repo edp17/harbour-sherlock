@@ -1598,6 +1598,13 @@ void SherlockEngine::rebuildDosClues()
     const int dropPerStrip = qMin(dropPerStripForDifficulty(n), maxDrops);
     const int keepPerStrip = qMax(0, (n - 1) - dropPerStrip);
 
+    auto placementPerColumnForDifficulty = [&](int n) -> int {
+        // How many "IsInCol" clues to add PER COLUMN stripe
+        if (m_difficulty == int(Easy))   return (n >= 6 ? 2 : 1);
+        if (m_difficulty == int(Medium)) return 1;
+        return 0; // Hard: none (positional only)
+    };
+
     // Always one group per column (Vertical)
     m_dosClueGroups.reserve(2 * n);
 
@@ -1632,6 +1639,67 @@ void SherlockEngine::rebuildDosClues()
         }
 
         m_dosClueGroups.push_back(g);
+    }
+
+    // --- Direct placement clues: IsInCol ---
+    // For each column stripe c, pick a few (row,item) pairs whose solution is exactly in that column.
+    const int placementPerCol = placementPerColumnForDifficulty(n);
+
+    if (placementPerCol > 0) {
+        // Deterministic order per puzzle + difficulty + column
+        for (int c = 0; c < n; ++c) {
+            // Collect all candidates for this column: (row r, item x = solution[r,c])
+            QVector<QPair<int,int>> candidates;
+            candidates.reserve(n);
+            for (int r = 0; r < n; ++r) {
+                const int x = m_solution[r * n + c];
+                candidates.push_back(qMakePair(r, x));
+            }
+
+            // Shuffle deterministically (re-use your existing deterministic RNG pattern)
+            // If you already have a seed/PRNG helper in rebuildDosClues(), use that.
+            // Here we use a simple deterministic hash based on puzzleSeed + difficulty + column.
+            quint32 seed = (m_puzzleSeed ^ 0xA341316Cu) + quint32(m_difficulty * 97 + c * 7919);
+            auto nextRand = [&]() -> quint32 {
+                seed = seed * 1664525u + 1013904223u;
+                return seed;
+            };
+            for (int i = candidates.size() - 1; i > 0; --i) {
+                int j = int(nextRand() % quint32(i + 1));
+                qSwap(candidates[i], candidates[j]);
+            }
+
+            // Add up to placementPerCol clues into the existing vertical group for column c
+            // Find that group (you built one group per column already)
+            for (int g = 0; g < m_dosClueGroups.size(); ++g) {
+                if (m_dosClueGroups[g].orient == Vertical && m_dosClueGroups[g].index == c) {
+                    int added = 0;
+                    for (int k = 0; k < candidates.size() && added < placementPerCol; ++k) {
+                        const int r = candidates[k].first;
+                        const int x = candidates[k].second;
+
+                        SemClue sc;
+                        sc.orient = Vertical;
+                        sc.index = c;
+
+                        sc.sem.type = ClueType::IsInCol;
+                        sc.sem.a = x;
+                        sc.sem.index = c;
+                        sc.sem.given = true;
+
+                        // For rendering: where the icon “is”
+                        sc.aRow = r;
+                        sc.aCol = c;
+                        sc.bRow = r;
+                        sc.bCol = c;
+
+                        m_dosClueGroups[g].clues.push_back(sc);
+                        ++added;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     // Always one group per row (Horizontal)

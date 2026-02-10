@@ -303,10 +303,11 @@ Page
                     return "image://sherlock/r" + rr + "_i" + ii + "?e=" + sherlockEngine.iconEpoch
                 }
 
-                function arrowForType(t) {
-                    t = Number(t)
+                function midTextForClue(clue) {
+                    var t = Number(clue.type)
                     if (t === 1) return "\u2192" // LeftOf
                     if (t === 2) return "\u2191" // Above
+                    if (t === 8) return "col " + (Number(clue.index) + 1) // IsInCol
                     return "?"
                 }
 
@@ -348,36 +349,33 @@ Page
                                                 height: cluePanel.iconPx
                                                 sourceSize.width: cluePanel.iconPx
                                                 sourceSize.height: cluePanel.iconPx
-
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
                                             }
 
                                             Label {
-                                                text: cluePanel.arrowForType(modelData.type)
+                                                text: cluePanel.midTextForClue(modelData)
                                                 font.pixelSize: Theme.fontSizeTiny
                                                 font.bold: true
                                                 color: cluePanel.textCol
                                                 verticalAlignment: Text.AlignVCenter
                                             }
 
+                                            // Second icon only for pairwise clues (LeftOf / Above).
                                             Image {
                                                 width: cluePanel.iconPx
                                                 height: cluePanel.iconPx
                                                 sourceSize.width: cluePanel.iconPx
                                                 sourceSize.height: cluePanel.iconPx
-
                                                 fillMode: Image.PreserveAspectFit
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                mipmap: false
-                                                visible: source !== ""
+                                                visible: (Number(modelData.type) === 1 || Number(modelData.type) === 2) && source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }
@@ -431,13 +429,12 @@ Page
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                mipmap: false
                                                 visible: source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
                                             }
 
                                             Label {
-                                                text: cluePanel.arrowForType(modelData.type)   // should be →
+                                                text: cluePanel.midTextForClue(modelData)
                                                 font.pixelSize: Theme.fontSizeTiny
                                                 font.bold: true
                                                 color: cluePanel.textCol
@@ -453,8 +450,7 @@ Page
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                mipmap: false
-                                                visible: source !== ""
+                                                visible: (Number(modelData.type) === 1 || Number(modelData.type) === 2) && source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }
