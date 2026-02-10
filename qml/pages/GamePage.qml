@@ -67,10 +67,6 @@ Page
 
         PullDownMenu
         {
-//            MenuItem {
-//                text: "New Game"
-//                onClicked: sherlockEngine.newGame()
-//            }
             MenuItem {
                 text: "Random puzzle"
                 onClicked: sherlockEngine.startRandomPuzzle()
@@ -79,15 +75,6 @@ Page
                 text: "Select bank puzzle"
                 onClicked: pageStack.push(Qt.resolvedUrl("PuzzlePickerPage.qml"))
             }
-//            MenuItem {
-//                text: "Next bank puzzle"
-//                onClicked: sherlockEngine.nextBankPuzzle()
-//            }
-//            MenuItem {
-//                text: "Previous bank puzzle"
-//                  enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
-//                  onClicked: sherlockEngine.previousBankPuzzle()
-//            }
             MenuItem {
                 text: "Restart puzzle"
                 onClicked: sherlockEngine.restartCurrentPuzzle()
@@ -106,10 +93,6 @@ Page
                 text: "Verify"
                 onClicked: sherlockEngine.verify()
             }
-//            MenuItem {
-//                text: "Reset Marks"
-//                onClicked: sherlockEngine.resetMarks()
-//            }
             MenuItem {
                 text: "Hint"
                 enabled: !sherlockEngine.solved
@@ -140,40 +123,6 @@ Page
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
             }
-//            MenuItem {
-//                text: "Use Generated Icons"
-//                onClicked: sherlockEngine.iconSource = 0   // Generated
-//                onClicked: sherlockEngine.iconSource = sherlockEngine.Generated
-//            }
-//            MenuItem {
-//                text: "Import sherlock.shi"
-//                onClicked: {
-//                    var p = pageStack.push(pickerPage)
-//                    p.selectedContentChanged.connect(function() {
-//                        if (p.selectedContent && p.selectedContent.length > 0) {
-//                            // file:// URL -> local path
-//                            var url = p.selectedContent[0].url
-//                            var path = url.toString().replace("file://", "")
-//                            sherlockEngine.importSherlockShi(path)
-//                        }
-//                        pageStack.pop()
-//                    })
-//                }
-//            }
-//            MenuItem {
-//                text: "Show Data Dir"
-//                onClicked: page.showNotification(sherlockEngine.dataDir)
-//            }
-//            MenuItem {
-//                text: "Icon Gallery"
-//                onClicked: pageStack.push(Qt.resolvedUrl("IconGalleryPage.qml"))
-//            }
-//            MenuItem {
-//                text: "Use Original (SHI) Icons"
-//                onClicked: sherlockEngine.iconSource = 1   // Shi
-//                onClicked: sherlockEngine.iconSource = sherlockEngine.Shi
-//                enabled: sherlockEngine.hasImportedImages
-//            }
         }
 
         Components.MagnifierPopup {
@@ -277,81 +226,37 @@ Page
             width: parent.width
             spacing: Theme.paddingLarge
 
-//            PageHeader { title: "Sherlock" }
-
-//            Label {
-//                text: {
-//                    var s = sherlockEngine.elapsedSeconds
-//                    var m = Math.floor(s / 60)
-//                    var ss = s % 60
-//                    return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
-//                }
-//                font.pixelSize: Theme.fontSizeSmall
-//                color: Theme.primaryColor
-//            }
-
-//            Label {
-//                anchors.left: parent.left
-//                anchors.right: parent.right
-//                anchors.margins: page.margin
-//                font.pixelSize: Theme.fontSizeExtraSmall
-//                color: Theme.secondaryColor
-//                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
-//                       ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
-//                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
-//                       : ("Seed " + sherlockEngine.puzzleSeed
-//                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
-//            }
-
-//            Label {
-//                visible: sherlockEngine.solved
-//                anchors.left: parent.left
-//                anchors.right: parent.right
-//                anchors.margins: page.margin
-//                text: "Solved!"
-//                color: Theme.highlightColor
-//                font.bold: true
-//            }
-
             // First row - header
             Item {
                 width: parent.width
                 height: Theme.itemSizeLarge
 
-                Row {
-                    anchors.fill: parent
+                Label {
+                    id: timerLabel
+                    anchors.left: parent.left
                     anchors.leftMargin: Theme.horizontalPageMargin
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: {
+                        var s = sherlockEngine.elapsedSeconds
+                        var m = Math.floor(s / 60)
+                        var ss = s % 60
+                        return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
+                    }
+                    font.pixelSize: Theme.fontSizeMedium
+                    color: Theme.secondaryColor
+                }
+
+                Label {
+                    id: titleLabel
+                    anchors.right: parent.right
                     anchors.rightMargin: Theme.horizontalPageMargin
-                    spacing: Theme.paddingMedium
+                    anchors.verticalCenter: parent.verticalCenter
 
-                    Label {
-                        id: timerLabel
-                        anchors.left: parent.left
-                        anchors.leftMargin: Theme.horizontalPageMargin
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: {
-                            var s = sherlockEngine.elapsedSeconds
-                            var m = Math.floor(s / 60)
-                            var ss = s % 60
-                            return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
-                        }
-                        font.pixelSize: Theme.fontSizeMedium
-                        color: Theme.secondaryColor
-                    }
-
-
-                    Label {
-                        id: titleLabel
-                        anchors.right: parent.right
-                        anchors.rightMargin: Theme.horizontalPageMargin
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        text: "Sherlock"
-                        // PageHeader-like look:
-                        font.pixelSize: Theme.fontSizeLarge
-                        font.bold: true
-                        color: Theme.highlightColor
-                    }
+                    text: "Sherlock"
+                    // PageHeader-like look:
+                    font.pixelSize: Theme.fontSizeLarge
+                    font.bold: true
+                    color: Theme.highlightColor
                 }
             }
 
