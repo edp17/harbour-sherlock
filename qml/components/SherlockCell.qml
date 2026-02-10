@@ -8,6 +8,7 @@ Item {
     property int colIndex: 0
     property bool use16px: false
     property bool magnifierEnabled: false
+    property bool showCandidates: (!root.fixed && !root.isCertain)
     signal magnifyRequested(int row, int col, int focusItem, real gx, real gy, real gw, real gh)
     readonly property bool conflicted: {
         var list = sherlockEngine.conflictCells
@@ -156,7 +157,8 @@ Item {
         anchors.right: parent.right
         anchors.bottom: parent.bottom
         anchors.margins: 0
-        height: Math.floor(parent.height * 0.46)
+        visible: root.showCandidates
+        height: root.showCandidates ? Math.floor(parent.height) : 0
         z: 10
 
         Grid {
