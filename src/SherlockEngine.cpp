@@ -113,6 +113,19 @@ int SherlockEngine::currentBankPuzzleId() const
     return m_puzzleId;
 }
 
+void SherlockEngine::setDifficulty(int d)
+{
+    if (d < int(Easy) || d > int(Hard)) d = int(Medium);
+    if (m_difficulty == d) return;
+
+    m_difficulty = d;
+    emit difficultyChanged();
+
+    // Difficulty affects the clue set only (not the puzzle).
+    rebuildDosClues();
+    emit dosClueGroupsChanged();
+}
+
 void SherlockEngine::loadSolvedBankFromDisk(int size)
 {
     m_solvedBankIds.clear();
@@ -1568,7 +1581,21 @@ void SherlockEngine::rebuildDosClues()
     };
 
     // For n>=5: drop exactly 1 adjacency clue per strip (keeps it simple but less revealing).
-    const int dropPerStrip = (n >= 5) ? 1 : 0;
+    // Difficulty: vary how many adjacency clues we drop from each strip.
+    // adjacency clues per strip is (n - 1)
+    auto dropPerStripForDifficulty = [&](int n) -> int {
+        if (m_difficulty == int(Easy)) {
+            return 0;               // Easy: keep all adjacency clues
+        } else if (m_difficulty == int(Medium)) {
+            return (n >= 5) ? 1 : 0; // Medium: your current behaviour
+        } else {
+            // Hard: fewer clues (but keep at least 1 adjacency if possible)
+            return (n >= 6) ? 2 : 1;
+        }
+    };
+
+    const int maxDrops = qMax(0, (n - 2));               // ensure at least 1 remains when n>1
+    const int dropPerStrip = qMin(dropPerStripForDifficulty(n), maxDrops);
     const int keepPerStrip = qMax(0, (n - 1) - dropPerStrip);
 
     // Always one group per column (Vertical)

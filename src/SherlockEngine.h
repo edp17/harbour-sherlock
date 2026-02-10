@@ -49,6 +49,7 @@ class SherlockEngine : public QObject
 
     Q_PROPERTY(QVariantList scores READ scores NOTIFY scoresChanged)
     Q_PROPERTY(bool autoCompleteEnabled READ autoCompleteEnabled WRITE setAutoCompleteEnabled NOTIFY autoCompleteEnabledChanged)
+    Q_PROPERTY(int difficulty READ difficulty WRITE setDifficulty NOTIFY difficultyChanged)
 
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
@@ -180,6 +181,15 @@ public:
         QVector<int> solution;    // m_solution (keeps game identity stable for undo/redo + future “check” features)
     };
 
+    enum Difficulty { Easy = 0, Medium = 1, Hard = 2 };
+    Q_ENUM(Difficulty)
+    Q_INVOKABLE int DIFF_EASY() const { return int(Easy); }
+    Q_INVOKABLE int DIFF_MEDIUM() const { return int(Medium); }
+    Q_INVOKABLE int DIFF_HARD() const { return int(Hard); }
+
+    int difficulty() const { return m_difficulty; }
+    Q_INVOKABLE void setDifficulty(int d);
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -200,6 +210,7 @@ signals:
     void scoresChanged();
     void solvedBankChanged();
     void autoCompleteEnabledChanged();
+    void difficultyChanged();
 
 private:
     int idx(int row, int col) const { return row * m_size + col; }
@@ -351,4 +362,6 @@ private:
 
     bool m_autoCompleteEnabled = false;
     bool m_inAutoComplete = false;
+
+    int m_difficulty { Medium };
 };

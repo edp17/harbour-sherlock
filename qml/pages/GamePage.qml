@@ -34,11 +34,15 @@ Page
         onPlayerNameChanged: {
             sherlockEngine.setPlayerName(appSettings.playerName)
         }
+        onDifficultyChanged: {
+            sherlockEngine.setDifficulty(appSettings.difficulty)
+        }
     }
 
     Component.onCompleted: {
         sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
+        sherlockEngine.setDifficulty(appSettings.difficulty)
     }
 
     Connections {

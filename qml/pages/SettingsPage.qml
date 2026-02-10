@@ -38,6 +38,17 @@ Page {
                 }
             }
 
+            ComboBox {
+                label: "Difficulty"
+                currentIndex: Math.max(0, Math.min(2, settings.difficulty))
+
+                menu: ContextMenu {
+                    MenuItem { text: "Easy";   onClicked: settings.difficulty = 0 }
+                    MenuItem { text: "Medium"; onClicked: settings.difficulty = 1 }
+                    MenuItem { text: "Hard";   onClicked: settings.difficulty = 2 }
+                }
+            }
+
             TextField {
                 label: "Player name"
                 text: settings.playerName

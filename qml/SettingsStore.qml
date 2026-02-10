@@ -9,4 +9,7 @@ ConfigurationGroup {
     property string playerName: ""
     property bool magnifierEnabled: false
     property bool autoCompleteEnabled: false
+
+    // 0=Easy, 1=Medium, 2=Hard
+    property int difficulty: 1
 }
