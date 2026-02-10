@@ -39,6 +39,13 @@ Page
         }
     }
 
+    Connections {
+        target: sherlockEngine
+        onSolvedChanged: {
+            if (sherlockEngine.solved) solvedPopup.open()
+        }
+    }
+
     Component.onCompleted: {
         sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
@@ -72,15 +79,15 @@ Page
                 text: "Select bank puzzle"
                 onClicked: pageStack.push(Qt.resolvedUrl("PuzzlePickerPage.qml"))
             }
-            MenuItem {
-                text: "Next bank puzzle"
-                onClicked: sherlockEngine.nextBankPuzzle()
-            }
-            MenuItem {
-                text: "Previous bank puzzle"
-                enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
-                onClicked: sherlockEngine.previousBankPuzzle()
-            }
+//            MenuItem {
+//                text: "Next bank puzzle"
+//                onClicked: sherlockEngine.nextBankPuzzle()
+//            }
+//            MenuItem {
+//                text: "Previous bank puzzle"
+//                  enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
+//                  onClicked: sherlockEngine.previousBankPuzzle()
+//            }
             MenuItem {
                 text: "Restart puzzle"
                 onClicked: sherlockEngine.restartCurrentPuzzle()
@@ -173,46 +180,216 @@ Page
             id: magnifierPopup
         }
 
+        // Solved popup
+        Item {
+            id: solvedOverlay
+            anchors.fill: parent
+            visible: false
+            z: 9999
+
+            function open()  { visible = true }
+            function close() { visible = false }
+
+            // Dim background
+            Rectangle {
+                anchors.fill: parent
+                color: "black"
+                opacity: 0.55
+            }
+
+            // Block clicks to underlying UI
+            MouseArea {
+                anchors.fill: parent
+                onClicked: solvedOverlay.close()
+            }
+
+            // Center card
+            Rectangle {
+                id: solvedCard
+                width: Math.min(parent.width - 2*Theme.horizontalPageMargin, Theme.itemSizeHuge * 3)
+                radius: Theme.paddingMedium
+                color: Theme.highlightBackgroundColor
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+
+                Column {
+                    width: parent.width
+                    spacing: Theme.paddingLarge
+                    anchors.margins: Theme.paddingLarge
+
+                    Label {
+                        text: "Solved!"
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        font.pixelSize: Theme.fontSizeLarge
+                        font.bold: true
+                        color: Theme.primaryColor
+                    }
+
+                    Label {
+                        text: "Time: " + (sherlockEngine.timerText || "")
+                        color: Theme.secondaryColor
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
+
+                    Label {
+                        text: "Player: " + (sherlockEngine.playerName || "")
+                        color: Theme.secondaryColor
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
+
+                    Label {
+                        // If you don’t have difficultyText yet, replace with your mapping from int
+                        text: "Difficulty: " + (sherlockEngine.difficultyText || sherlockEngine.difficulty)
+                        color: Theme.secondaryColor
+                        font.pixelSize: Theme.fontSizeSmall
+                    }
+
+                    Row {
+                        width: parent.width
+                        spacing: Theme.paddingMedium
+
+                        Button {
+                            text: "Next puzzle"
+                            width: (parent.width - Theme.paddingMedium) / 2
+                            onClicked: {
+                                solvedOverlay.close()
+                                sherlockEngine.nextPuzzleAccordingToMode()
+                            }
+                        }
+
+                        Button {
+                            text: "Scores"
+                            width: (parent.width - Theme.paddingMedium) / 2
+                            onClicked: {
+                                solvedOverlay.close()
+                                pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Column
         {
             id: column
             width: parent.width
             spacing: Theme.paddingLarge
 
-            PageHeader { title: "Sherlock" }
+//            PageHeader { title: "Sherlock" }
 
-            Label {
-                text: {
-                    var s = sherlockEngine.elapsedSeconds
-                    var m = Math.floor(s / 60)
-                    var ss = s % 60
-                    return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
+//            Label {
+//                text: {
+//                    var s = sherlockEngine.elapsedSeconds
+//                    var m = Math.floor(s / 60)
+//                    var ss = s % 60
+//                    return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
+//                }
+//                font.pixelSize: Theme.fontSizeSmall
+//                color: Theme.primaryColor
+//            }
+
+//            Label {
+//                anchors.left: parent.left
+//                anchors.right: parent.right
+//                anchors.margins: page.margin
+//                font.pixelSize: Theme.fontSizeExtraSmall
+//                color: Theme.secondaryColor
+//                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
+//                       ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
+//                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
+//                       : ("Seed " + sherlockEngine.puzzleSeed
+//                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
+//            }
+
+//            Label {
+//                visible: sherlockEngine.solved
+//                anchors.left: parent.left
+//                anchors.right: parent.right
+//                anchors.margins: page.margin
+//                text: "Solved!"
+//                color: Theme.highlightColor
+//                font.bold: true
+//            }
+
+            // First row - header
+            Item {
+                width: parent.width
+                height: Theme.itemSizeLarge
+
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: Theme.horizontalPageMargin
+                    anchors.rightMargin: Theme.horizontalPageMargin
+                    spacing: Theme.paddingMedium
+
+                    Label {
+                        id: timerLabel
+                        anchors.left: parent.left
+                        anchors.leftMargin: Theme.horizontalPageMargin
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: {
+                            var s = sherlockEngine.elapsedSeconds
+                            var m = Math.floor(s / 60)
+                            var ss = s % 60
+                            return (m < 10 ? "0" : "") + m + ":" + (ss < 10 ? "0" : "") + ss
+                        }
+                        font.pixelSize: Theme.fontSizeMedium
+                        color: Theme.secondaryColor
+                    }
+
+
+                    Label {
+                        id: titleLabel
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.horizontalPageMargin
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        text: "Sherlock"
+                        // PageHeader-like look:
+                        font.pixelSize: Theme.fontSizeLarge
+                        font.bold: true
+                        color: Theme.highlightColor
+                    }
                 }
-                font.pixelSize: Theme.fontSizeSmall
-                color: Theme.primaryColor
             }
 
-            Label {
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: page.margin
-                font.pixelSize: Theme.fontSizeExtraSmall
-                color: Theme.secondaryColor
-                text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
-                       ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
-                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
-                       : ("Seed " + sherlockEngine.puzzleSeed
-                          + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
-            }
+            // Second row
+            Row {
+                width: parent.width
+                height: Theme.itemSizeMedium
+                anchors.leftMargin: Theme.horizontalPageMargin
+                anchors.rightMargin: Theme.horizontalPageMargin
+                spacing: Theme.paddingMedium
 
-            Label {
-                visible: sherlockEngine.solved
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.margins: page.margin
-                text: "Solved!"
-                color: Theme.highlightColor
-                font.bold: true
+                IconButton {
+                    id: leftBtn
+                    icon.source: "image://theme/icon-m-left"
+                    enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
+                    onClicked: sherlockEngine.previousBankPuzzle()
+                }
+
+                Label {
+                    width: parent.width - leftBtn.width - rightBtn.width - Theme.paddingLarge
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
+                    text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
+                           ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
+                              + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
+                           : ("Seed " + sherlockEngine.puzzleSeed
+                              + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
+                    color: Theme.primaryColor
+                    font.pixelSize: Theme.fontSizeSmall
+                }
+
+                IconButton {
+                    id: rightBtn
+                    icon.source: "image://theme/icon-m-right"
+                    enabled: !sherlockEngine.randomSelected
+                    onClicked: sherlockEngine.nextBankPuzzle()
+                }
             }
 
             // --- Docked clue panels (DOS-like layout) ---
@@ -245,7 +422,8 @@ Page
 
                 readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
 
-                readonly property int iconPx: Math.floor(Theme.iconSizeSmall * 0.70)
+                // Bigger icons for clues (separate from board cell rendering)
+                property int iconPx: Math.max(22, Math.floor(Theme.iconSizeMedium * 0.7))
                 readonly property int clueGap: Math.max(1, Math.floor(Theme.paddingSmall * 0.45))
 
                 readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
@@ -336,7 +514,7 @@ Page
 
                     Row {
                         id: vRow
-                        spacing: cluePanel.clueGap
+                        spacing: Theme.paddingSmall
 
                         Repeater {
                             model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []

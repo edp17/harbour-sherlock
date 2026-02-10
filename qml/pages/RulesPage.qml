@@ -126,6 +126,117 @@ Page {
         }
     }
 
+function midTextForRulesExample(type, index1based) {
+    if (type === 1) return "\u2192" // LeftOf
+    if (type === 2) return "\u2191" // Above
+    if (type === 8) return "" + index1based        // IsInCol/IsInRow (displayed as number only)
+    if (type === 10) return "\u2260 " + index1based // NotInCol/NotInRow (≠ N)
+    return "?"
+}
+
+Component {
+    id: exampleArrowClueRow
+
+    Item {
+        width: parent ? parent.width : page.width
+        height: Math.max(leftIcon.height, rightIcon.height, midLabel.implicitHeight, descLabel.implicitHeight)
+
+        Row {
+            id: row
+            width: parent.width
+            spacing: Theme.paddingMedium
+
+            Image {
+                id: leftIcon
+                width: Theme.iconSizeMedium
+                height: Theme.iconSizeMedium
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                source: iconSourceFor(0, 0)
+            }
+
+            Label {
+                id: midLabel
+                text: midTextForRulesExample(1, 0) // →
+                font.pixelSize: Theme.fontSizeSmall
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            Image {
+                id: rightIcon
+                width: Theme.iconSizeMedium
+                height: Theme.iconSizeMedium
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                source: iconSourceFor(0, 1)
+            }
+
+            Label {
+                id: descLabel
+                width: Math.max(0, parent.width - (Theme.iconSizeMedium * 2) - Theme.paddingMedium * 2 - Theme.fontSizeLarge)
+                text: "means: left icon is left of right icon"
+                wrapMode: Text.WordWrap
+                color: Theme.secondaryColor
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+    }
+}
+
+Component {
+    id: examplePlacementClueRow
+
+    // parameterized via properties set by Loader
+    Item {
+        id: wrapper
+        width: parent ? parent.width : page.width
+
+        property int type: 8              // 8=IsInCol/IsInRow, 10=NotInCol/NotInRow
+        property int index1based: 3
+        property string description: ""
+
+        height: Math.max(icon.height, mid.implicitHeight, desc.implicitHeight)
+
+        Row {
+            width: parent.width
+            spacing: Theme.paddingMedium
+
+            Image {
+                id: icon
+                width: Theme.iconSizeMedium
+                height: Theme.iconSizeMedium
+                sourceSize.width: width
+                sourceSize.height: height
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+                source: iconSourceFor(0, 0)
+            }
+
+            Label {
+                id: mid
+                text: midTextForRulesExample(wrapper.type, wrapper.index1based)
+                font.pixelSize: Theme.fontSizeSmall
+                font.bold: true
+                verticalAlignment: Text.AlignVCenter
+            }
+
+            Label {
+                id: desc
+                width: Math.max(0, parent.width - Theme.iconSizeMedium - Theme.paddingMedium * 2 - Theme.fontSizeLarge)
+                text: wrapper.description
+                wrapMode: Text.WordWrap
+                color: Theme.secondaryColor
+                verticalAlignment: Text.AlignVCenter
+            }
+        }
+    }
+}
+
     SilicaFlickable {
         anchors.fill: parent
 
@@ -172,38 +283,53 @@ Page {
                     delegate: bulletRow
                 }
 
-                SectionHeader { text: "Clues" }
+SectionHeader { text: "Clues" }
 
-                Label {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: "Clues describe relationships between items. Clues are shown in DOS-style stripes (vertical and horizontal)."
-                }
+Label {
+    width: parent.width
+    wrapMode: Text.WordWrap
+    text: "Clues describe relationships between icons. Clues are shown in DOS-style stripes:"
+}
 
-                Loader {
-                    id: clueExampleLoader
-                    width: parent.width
-                    sourceComponent: exampleClueRow
+Repeater {
+    model: [
+        "Vertical stripes are column clues. The number refers to a column (1.." + (sherlockEngine ? sherlockEngine.size : 6) + ").",
+        "Horizontal stripes are row clues. The number refers to a row (1.." + (sherlockEngine ? sherlockEngine.size : 6) + ").",
+        "Arrows show relative position: → (left of) and ↑ (above)."
+    ]
+    delegate: bulletRow
+}
 
-                    // Reserve space for the loaded item in the Column:
-                    height: item ? itemHeight : 0
+// Example: pairwise arrow clue
+Loader {
+    width: parent.width
+    sourceComponent: exampleArrowClueRow
+    height: item ? item.height : 0
+}
 
-                    // writable helper
-                    property real itemHeight: 0
+// Example: placement clue (number only)
+Loader {
+    width: parent.width
+    sourceComponent: examplePlacementClueRow
+    height: item ? item.height : 0
+    onLoaded: {
+        item.type = 8
+        item.index1based = 3
+        item.description = "means: this icon is in column/row 3 (stripe orientation tells which)"
+    }
+}
 
-                    onItemChanged: {
-                        itemHeight = item ? item.height : 0
-                    }
-                }
-
-                Repeater {
-                    model: [
-                        "Horizontal stripe clues relate items within the same row group.",
-                        "Vertical stripe clues relate items within the same column group.",
-                        "Clues use arrows (→, ↑) to show direction relationships."
-                    ]
-                    delegate: bulletRow
-                }
+// Example: negative placement clue (≠ number)
+Loader {
+    width: parent.width
+    sourceComponent: examplePlacementClueRow
+    height: item ? item.height : 0
+    onLoaded: {
+        item.type = 10
+        item.index1based = 3
+        item.description = "means: this icon is NOT in column/row 3 (stripe orientation tells which)"
+    }
+}
 
                 SectionHeader { text: "Timer & score" }
 
