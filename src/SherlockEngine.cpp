@@ -20,8 +20,58 @@
 #include <QJsonValue>
 #include <QStandardPaths>
 #include <QDir>
+#include <QDataStream>
+#include <QIODevice>
 
 #include "ShiReader.h"
+
+static QByteArray packSnapshots(const QVector<SherlockEngine::Snapshot> &v)
+{
+    QByteArray ba;
+    QDataStream ds(&ba, QIODevice::WriteOnly);
+    ds.setVersion(QDataStream::Qt_5_6);
+
+    ds << quint32(v.size());
+    for (const auto &s : v) {
+        ds << qint32(s.size);
+        ds << s.masks;
+        ds << s.fixed;
+        ds << s.solution;
+    }
+    return ba;
+}
+
+static bool unpackSnapshots(const QByteArray &ba, QVector<SherlockEngine::Snapshot> &out)
+{
+    out.clear();
+    if (ba.isEmpty())
+        return true;
+
+    QDataStream ds(ba);
+    ds.setVersion(QDataStream::Qt_5_6);
+
+    quint32 count = 0;
+    ds >> count;
+    if (ds.status() != QDataStream::Ok)
+        return false;
+
+    out.reserve(int(count));
+    for (quint32 i = 0; i < count; ++i) {
+        SherlockEngine::Snapshot s;
+        qint32 sz = 0;
+        ds >> sz;
+        s.size = int(sz);
+        ds >> s.masks;
+        ds >> s.fixed;
+        ds >> s.solution;
+
+        if (ds.status() != QDataStream::Ok)
+            return false;
+
+        out.push_back(std::move(s));
+    }
+    return true;
+}
 
 // Constructor
 SherlockEngine::SherlockEngine(QObject *parent)
@@ -828,6 +878,39 @@ void SherlockEngine::loadState()
         for (int i = 0; i < cellCount; ++i)
             m_fixed[i] = 0;
     }
+
+    // 5) Timer
+    m_elapsedSeconds = s.value(QStringLiteral("elapsedSeconds"), 0).toInt();
+    emit elapsedSecondsChanged();
+
+    const bool timerRunning = s.value(QStringLiteral("timerRunning"), false).toBool();
+
+    // 6) Undo/Redo stacks
+    m_undo.clear();
+    m_redo.clear();
+    {
+        QVector<Snapshot> tmpUndo;
+        QVector<Snapshot> tmpRedo;
+
+        const QByteArray undoBytes = s.value(QStringLiteral("undoStack")).toByteArray();
+        const QByteArray redoBytes = s.value(QStringLiteral("redoStack")).toByteArray();
+
+        const bool okUndo = unpackSnapshots(undoBytes, tmpUndo);
+        const bool okRedo = unpackSnapshots(redoBytes, tmpRedo);
+
+        if (okUndo && okRedo) {
+            // Keep only snapshots matching current size (avoid cross-size corruption)
+            auto sizeFilter = [this](const Snapshot &sn) { return sn.size == m_size; };
+
+            for (const auto &sn : tmpUndo)
+                if (sizeFilter(sn)) m_undo.push_back(sn);
+
+            for (const auto &sn : tmpRedo)
+                if (sizeFilter(sn)) m_redo.push_back(sn);
+        }
+    }
+    emit undoRedoChanged();
+
     rebuildClues();
     emit iconSourceChanged();
     updateSolvedState(false);
@@ -835,6 +918,13 @@ void SherlockEngine::loadState()
     ++m_iconEpoch;
     emit imagesChanged();
     emit boardChanged();
+
+    // Start timer only if it was running previously and puzzle isn't solved
+    if (timerRunning && !m_solved) {
+        m_gameTimer.start();
+    } else {
+        m_gameTimer.stop();
+    }
 }
 
 void SherlockEngine::saveState() const
@@ -843,10 +933,13 @@ void SherlockEngine::saveState() const
     s.setValue(QStringLiteral("size"), m_size);
     s.setValue(QStringLiteral("iconSource"), int(m_iconSource));
     s.setValue(QStringLiteral("autoCompleteEnabled"), m_autoCompleteEnabled);
-
     s.setValue(QStringLiteral("puzzleSource"), int(m_puzzleSource));
     s.setValue(QStringLiteral("puzzleId"), m_puzzleId);
     s.setValue(QStringLiteral("puzzleSeed"), uint(m_puzzleSeed));
+    s.setValue(QStringLiteral("elapsedSeconds"), m_elapsedSeconds);
+    s.setValue(QStringLiteral("timerRunning"), m_gameTimer.isActive());
+    s.setValue(QStringLiteral("undoStack"), packSnapshots(m_undo));
+    s.setValue(QStringLiteral("redoStack"), packSnapshots(m_redo));
 
     QVariantList outMasks;
     outMasks.reserve(m_masks.size());

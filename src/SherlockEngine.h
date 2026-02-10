@@ -172,6 +172,14 @@ public:
     bool autoCompleteEnabled() const { return m_autoCompleteEnabled; }
     Q_INVOKABLE void setAutoCompleteEnabled(bool on);
 
+    // --- Undo/Redo snapshot (Step 1: internal) ---
+    struct Snapshot {
+        int size = 0;
+        QVector<quint32> masks;   // m_masks
+        QVector<quint8> fixed;    // m_fixed
+        QVector<int> solution;    // m_solution (keeps game identity stable for undo/redo + future “check” features)
+    };
+
 signals:
     void sizeChanged();
     void boardChanged();
@@ -214,14 +222,6 @@ private:
     bool m_timerArmed = false; // "start on first action" gate
 
 private:
-    // --- Undo/Redo snapshot (Step 1: internal) ---
-    struct Snapshot {
-        int size = 0;
-        QVector<quint32> masks;   // m_masks
-        QVector<quint8> fixed;    // m_fixed
-        QVector<int> solution;    // m_solution (keeps game identity stable for undo/redo + future “check” features)
-    };
-
     Snapshot captureSnapshot() const;
     bool applySnapshot(const Snapshot &s, bool persist);
 
