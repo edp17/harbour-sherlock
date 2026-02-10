@@ -118,6 +118,14 @@ Page
                 onClicked: pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
             }
             MenuItem {
+                text: "Game Rules"
+                onClicked: pageStack.push(Qt.resolvedUrl("RulesPage.qml"))
+            }
+            MenuItem {
+                text: "About"
+                onClicked: pageStack.push(Qt.resolvedUrl("AboutPage.qml"))
+            }
+            MenuItem {
                 text: "Reveal Solution (debug)"
                 onClicked: sherlockEngine.revealSolution()
             }
