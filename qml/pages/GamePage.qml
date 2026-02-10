@@ -303,12 +303,26 @@ Page
                     return "image://sherlock/r" + rr + "_i" + ii + "?e=" + sherlockEngine.iconEpoch
                 }
 
-                function midTextForClue(clue) {
+                function midTextForClue(clue, orient) {
                     var t = Number(clue.type)
+                    var idx = Number(clue.index) + 1
+
                     if (t === 1) return "\u2192" // LeftOf
                     if (t === 2) return "\u2191" // Above
-                    if (t === 8) return "col " + (Number(clue.index) + 1) // IsInCol
+
+                    // Placement clues: no "col/row" text, orientation implies it.
+                    if (t === 8)  return "" + idx         // IsInCol
+                    if (t === 10) return "\u2260 " + idx  // NotInCol (≠)
+
+                    if (t === 7)  return "" + idx         // IsInRow (future)
+                    if (t === 9)  return "\u2260 " + idx  // NotInRow (future)
+
                     return "?"
+                }
+
+                function isPairwiseClue(clue) {
+                    var t = Number(clue.type)
+                    return (t === 1 || t === 2) // LeftOf / Above
                 }
 
                 // Top: vertical semantic clues
@@ -358,7 +372,7 @@ Page
                                             }
 
                                             Label {
-                                                text: cluePanel.midTextForClue(modelData)
+                                                text: cluePanel.midTextForClue(modelData, 0)
                                                 font.pixelSize: Theme.fontSizeTiny
                                                 font.bold: true
                                                 color: cluePanel.textCol
@@ -375,7 +389,7 @@ Page
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                visible: (Number(modelData.type) === 1 || Number(modelData.type) === 2) && source !== ""
+                                                visible: cluePanel.isPairwiseClue(modelData) && source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }
@@ -434,7 +448,7 @@ Page
                                             }
 
                                             Label {
-                                                text: cluePanel.midTextForClue(modelData)
+                                                text: cluePanel.midTextForClue(modelData, 1)
                                                 font.pixelSize: Theme.fontSizeTiny
                                                 font.bold: true
                                                 color: cluePanel.textCol
@@ -450,7 +464,7 @@ Page
                                                 cache: true
                                                 asynchronous: true
                                                 smooth: false
-                                                visible: (Number(modelData.type) === 1 || Number(modelData.type) === 2) && source !== ""
+                                                visible: cluePanel.isPairwiseClue(modelData) && source !== ""
                                                 source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
                                             }
                                         }

@@ -1605,6 +1605,12 @@ void SherlockEngine::rebuildDosClues()
         return 0; // Hard: none (positional only)
     };
 
+    auto notInColPerColumnForDifficulty = [&](int n) -> int {
+        if (m_difficulty == int(Easy))   return 0;
+        if (m_difficulty == int(Medium)) return 1;
+        return (n >= 6 ? 2 : 1); // Hard
+    };
+
     // Always one group per column (Vertical)
     m_dosClueGroups.reserve(2 * n);
 
@@ -1688,6 +1694,71 @@ void SherlockEngine::rebuildDosClues()
                         sc.sem.given = true;
 
                         // For rendering: where the icon “is”
+                        sc.aRow = r;
+                        sc.aCol = c;
+                        sc.bRow = r;
+                        sc.bCol = c;
+
+                        m_dosClueGroups[g].clues.push_back(sc);
+                        ++added;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // --- Negative placement clues: NotInCol ---
+    const int notInPerCol = notInColPerColumnForDifficulty(n);
+
+    if (notInPerCol > 0) {
+        for (int c = 0; c < n; ++c) {
+            QVector<QPair<int,int>> candidates;
+            candidates.reserve(n * (n - 1));
+
+            // Build all valid (row,item) pairs where item is NOT in this column
+            for (int r = 0; r < n; ++r) {
+                const int actualItem = m_solution[r * n + c];
+                for (int x = 0; x < n; ++x) {
+                    if (x == actualItem)
+                        continue; // would contradict IsInCol
+
+                    candidates.push_back(qMakePair(r, x));
+                }
+            }
+
+            // Deterministic shuffle
+            quint32 seed = (m_puzzleSeed ^ 0xC8013EA4u)
+                           + quint32(m_difficulty * 131 + c * 3571);
+            auto nextRand = [&]() -> quint32 {
+                seed = seed * 1664525u + 1013904223u;
+                return seed;
+            };
+
+            for (int i = candidates.size() - 1; i > 0; --i) {
+                int j = int(nextRand() % quint32(i + 1));
+                qSwap(candidates[i], candidates[j]);
+            }
+
+            // Inject into the vertical group for column c
+            for (int g = 0; g < m_dosClueGroups.size(); ++g) {
+                if (m_dosClueGroups[g].orient == Vertical &&
+                    m_dosClueGroups[g].index == c) {
+
+                    int added = 0;
+                    for (int k = 0; k < candidates.size() && added < notInPerCol; ++k) {
+                        const int r = candidates[k].first;
+                        const int x = candidates[k].second;
+
+                        SemClue sc;
+                        sc.orient = Vertical;
+                        sc.index = c;
+
+                        sc.sem.type = ClueType::NotInCol;
+                        sc.sem.a = x;
+                        sc.sem.index = c;
+                        sc.sem.given = true;
+
                         sc.aRow = r;
                         sc.aCol = c;
                         sc.bRow = r;
