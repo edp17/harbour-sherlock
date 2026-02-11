@@ -15,6 +15,7 @@ Page
     readonly property int n: sherlockEngine.size
     readonly property real margin: Theme.horizontalPageMargin
     readonly property real gap: Theme.paddingSmall
+    property bool solvedPopupShownForThisState: false
 
     SettingsStore {
         id: appSettings
@@ -47,8 +48,28 @@ Page
                 solvedPopup.playerName = appSettings.playerName
                 solvedPopup.difficulty = appSettings.difficulty
                 solvedPopup.open()
+                solvedPopupShownForThisState = true
             } else {
                 solvedPopup.close()
+                solvedPopupShownForThisState = false
+            }
+        }
+    }
+
+    Timer {
+        id: solvedStartupTimer
+        interval: 0
+        repeat: false
+        running: false
+        onTriggered: {
+            if (sherlockEngine.solved) {
+                // Use the same assignments you do on a normal solve (if you have them)
+                // Minimal version (works even if you don't set fields here):
+                solvedPopup.elapsedSeconds = sherlockEngine.elapsedSeconds
+                solvedPopup.playerName = appSettings.playerName
+                solvedPopup.difficulty = appSettings.difficulty
+                solvedPopup.open()
+                solvedPopupShownForThisState = true
             }
         }
     }
@@ -57,6 +78,7 @@ Page
         sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
         sherlockEngine.setDifficulty(appSettings.difficulty)
+        solvedStartupTimer.start()
     }
 
     Connections {
