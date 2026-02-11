@@ -1890,6 +1890,26 @@ int SherlockEngine::maskAt(int row, int col) const
     return int(m_masks[idx(row, col)]);
 }
 
+int SherlockEngine::fixedItemAt(int row, int col) const
+{
+    if (row < 0 || row >= m_size || col < 0 || col >= m_size)
+        return -1;
+
+    const int i = idx(row, col);
+    if (!isFixedIndex(i))
+        return -1;
+
+    const int cells = m_size * m_size;
+    if (m_solution.size() != cells)
+        return -1;
+
+    const int item = m_solution[i];   // 0..n-1
+    if (item < 0 || item >= m_size)
+        return -1;
+
+    return item;
+}
+
 void SherlockEngine::setMask(int row, int col, quint32 m)
 {
     if (row < 0 || row >= m_size || col < 0 || col >= m_size) return;

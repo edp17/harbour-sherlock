@@ -127,6 +127,8 @@ public:
     // "givens" (locked cells)
     Q_INVOKABLE bool fixedAt(int row, int col) const;
 
+    Q_INVOKABLE int fixedItemAt(int row, int col) const;
+
     Q_PROPERTY(bool canUndo READ canUndo NOTIFY undoRedoChanged)
     Q_PROPERTY(bool canRedo READ canRedo NOTIFY undoRedoChanged)
 

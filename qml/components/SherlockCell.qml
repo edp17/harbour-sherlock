@@ -33,6 +33,9 @@ Item {
         return Number(list[i])
     }
     readonly property bool fixed: sherlockEngine.fixedAt(rowIndex, colIndex)
+    readonly property int fixedItem: sherlockEngine.fixedItemAt(rowIndex, colIndex)
+    readonly property bool effectiveCertain: root.fixed ? true : root.isCertain
+    readonly property int effectiveItem: root.fixed ? fixedItem : certainItem
     readonly property int certainCand: {
         if (!isCertain) return -1
         for (var i = 0; i < n; ++i) {
@@ -128,7 +131,7 @@ Item {
         cache: true
         asynchronous: true
         fillMode: Image.PreserveAspectFit
-        visible: root.isCertain
+        visible: root.effectiveCertain
     }
 
     Label {
@@ -226,6 +229,7 @@ Item {
                                                   + "?e=" + sherlockEngine.iconEpoch)
                             opacity: markCell.isOn ? 1.0 : 0.22
                             visible: status === Image.Ready
+
                         }
 
                         // Fallback: show number if the image isn't available yet / failed
@@ -272,7 +276,7 @@ Item {
     }
 
     function fileNameForCell() {
-        var item = certainItem
+        var item = effectiveItem
         var idx = rowIndex * iconBankN + item + 1
         var idx2 = (idx < 10 ? "0" : "") + idx
         var rowLetter = String.fromCharCode("A".charCodeAt(0) + rowIndex)
