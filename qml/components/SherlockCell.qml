@@ -131,6 +131,17 @@ Item {
         visible: root.isCertain
     }
 
+    Label {
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Theme.paddingLarge
+        text: root.isCertain ? (root.certainCand + 1) : ""
+        font.pixelSize: Theme.fontSizeLarge
+        font.bold: true
+        color: Theme.primaryColor
+        visible: root.isCertain && icon.status !== Image.Ready
+    }
+
     BackgroundItem {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -190,27 +201,42 @@ Item {
                     border.width: 1
                     color: markCell.isOn
                            ? Theme.rgba(Theme.highlightColor, 0.18)
-                           : Theme.rgba(Theme.primaryColor, 0.00)
+                           : Theme.rgba(Theme.primaryColor, 0.04)
                     border.color: markCell.isOn
                            ? Theme.rgba(Theme.primaryColor, 0.30)
                            : Theme.rgba(Theme.primaryColor, 0.18)
 
-                    // Candidate icon
-                    Image {
+                    // Candidate icon (with fallback)
+                    Item {
                         anchors.centerIn: parent
                         width: parent.width * 0.9
                         height: width
-                        fillMode: Image.PreserveAspectFit
-                        smooth: false
-                        cache: true
-                        asynchronous: true
 
-                        source: Qt.resolvedUrl("../assets/generated_icons/" + (use16px ? "icons_16x16/" : "icons_32x32/")
-                                              + genBankFile(root.rowIndex, markCell.cand) + "?e=" + sherlockEngine.iconEpoch)
+                        // File-backed icon
+                        Image {
+                            id: candImg
+                            anchors.fill: parent
+                            fillMode: Image.PreserveAspectFit
+                            smooth: false
+                            cache: true
+                            asynchronous: true
+                            source: Qt.resolvedUrl("../assets/generated_icons/"
+                                                  + (use16px ? "icons_16x16/" : "icons_32x32/")
+                                                  + genBankFile(root.rowIndex, markCell.cand)
+                                                  + "?e=" + sherlockEngine.iconEpoch)
+                            opacity: markCell.isOn ? 1.0 : 0.22
+                            visible: status === Image.Ready
+                        }
 
-                        opacity: markCell.isOn ? 1.0 : 0.18
-                        visible: true
-
+                        // Fallback: show number if the image isn't available yet / failed
+                        Label {
+                            anchors.centerIn: parent
+                            text: (markCell.cand + 1)
+                            font.pixelSize: Math.max(10, Math.floor(parent.width * 0.55))
+                            font.bold: true
+                            color: Theme.rgba(Theme.primaryColor, markCell.isOn ? 0.95 : 0.35)
+                            visible: candImg.status !== Image.Ready
+                        }
                     }
 
                     // Input layer

@@ -106,7 +106,9 @@ Page
             }
             MenuItem {
                 text: "Restart puzzle"
-                onClicked: sherlockEngine.restartCurrentPuzzle()
+                onClicked: {
+                    sherlockEngine.restartCurrentPuzzle()
+                }
             }
             MenuItem {
                 text: "Undo"
@@ -206,6 +208,7 @@ Page
 
             // Second row
             Row {
+                id: bankRow
                 width: parent.width
                 height: Theme.itemSizeMedium
                 anchors.leftMargin: Theme.horizontalPageMargin

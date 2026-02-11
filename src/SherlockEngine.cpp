@@ -598,6 +598,30 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
         }
     }
 
+    // ---- SANITIZE: never allow 0-mask cells after (re)starting a puzzle ----
+    const quint32 fm = fullMask();
+
+    // Ensure vectors are at least the right size (defensive)
+    if (m_masks.size() != cells) m_masks.resize(cells);
+    if (m_fixed.size() != cells) m_fixed.resize(cells);
+
+    for (int i = 0; i < cells; ++i) {
+        if (m_fixed[i]) {
+            // Fixed/given must always display a single icon
+            if (i >= 0 && i < m_solution.size()) {
+                const int sol = m_solution[i];
+                m_masks[i] = bit(sol);
+            } else {
+                // fallback: still keep non-zero
+                m_masks[i] = fm;
+            }
+        } else {
+            quint32 m = (m_masks[i] & fm);
+            if (m == 0) m = fm;
+            m_masks[i] = m;
+        }
+    }
+
     // Reset undo/redo stacks for a new puzzle
     m_undo.clear();
     m_redo.clear();
@@ -1448,9 +1472,36 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
     }
 
     // Restore authoritative state
+    // Defensive resize
     m_masks = s.masks;
     m_fixed = s.fixed;
     m_solution = s.solution;
+
+    const quint32 fm = fullMask();
+
+    // Fix sizes
+    if (m_masks.size() != cells) {
+        const int old = m_masks.size();
+        m_masks.resize(cells);
+        for (int i = old; i < cells; ++i) m_masks[i] = fm;
+    }
+    if (m_fixed.size() != cells) {
+        const int old = m_fixed.size();
+        m_fixed.resize(cells);
+        for (int i = old; i < cells; ++i) m_fixed[i] = 0;
+    }
+    if (m_solution.size() != cells) {
+        // keep your existing logic here; don't invent new generation
+        // (if you already rebuild solution elsewhere, you can leave this alone)
+    }
+
+    // Clamp masks: no zeros, no bits outside fullMask
+    for (int i = 0; i < cells; ++i) {
+        quint32 m = (m_masks[i] & fm);
+        if (m == 0) m = fm;
+        m_masks[i] = m;
+    }
+
     clearHint();
 
     // Derived data + notifications
@@ -1825,14 +1876,21 @@ int SherlockEngine::maskAt(int row, int col) const
 
 void SherlockEngine::setMask(int row, int col, quint32 m)
 {
-    if (row < 0 || row >= m_size || col < 0 || col >= m_size)
-        return;
+    if (row < 0 || row >= m_size || col < 0 || col >= m_size) return;
+
     const int i = idx(row, col);
-    if (m_masks[i] == m)
-        return;
+
+    // Never allow empty candidate set in the model.
+    // (Empty masks cause blank tiles in QML.)
+    m &= fullMask();
+    if (m == 0) m = fullMask();
+
+    if (m_masks[i] == m) return;
+
     clearConflicts();
     clearHint();
     m_masks[i] = m;
+
     updateSolvedState(true);
     emit boardChanged();
     saveState();
