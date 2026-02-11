@@ -42,7 +42,14 @@ Page
     Connections {
         target: sherlockEngine
         onSolvedChanged: {
-            if (sherlockEngine.solved) solvedPopup.open()
+            if (sherlockEngine.solved) {
+                solvedPopup.elapsedSeconds = sherlockEngine.elapsedSeconds
+                solvedPopup.playerName = appSettings.playerName
+                solvedPopup.difficulty = appSettings.difficulty
+                solvedPopup.open()
+            } else {
+                solvedPopup.close()
+            }
         }
     }
 
@@ -129,95 +136,10 @@ Page
             id: magnifierPopup
         }
 
-        // Solved popup
-        Item {
-            id: solvedOverlay
-            anchors.fill: parent
-            visible: false
-            z: 9999
-
-            function open()  { visible = true }
-            function close() { visible = false }
-
-            // Dim background
-            Rectangle {
-                anchors.fill: parent
-                color: "black"
-                opacity: 0.55
-            }
-
-            // Block clicks to underlying UI
-            MouseArea {
-                anchors.fill: parent
-                onClicked: solvedOverlay.close()
-            }
-
-            // Center card
-            Rectangle {
-                id: solvedCard
-                width: Math.min(parent.width - 2*Theme.horizontalPageMargin, Theme.itemSizeHuge * 3)
-                radius: Theme.paddingMedium
-                color: Theme.highlightBackgroundColor
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.verticalCenter: parent.verticalCenter
-
-                Column {
-                    width: parent.width
-                    spacing: Theme.paddingLarge
-                    anchors.margins: Theme.paddingLarge
-
-                    Label {
-                        text: "Solved!"
-                        width: parent.width
-                        horizontalAlignment: Text.AlignHCenter
-                        font.pixelSize: Theme.fontSizeLarge
-                        font.bold: true
-                        color: Theme.primaryColor
-                    }
-
-                    Label {
-                        text: "Time: " + (sherlockEngine.timerText || "")
-                        color: Theme.secondaryColor
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
-
-                    Label {
-                        text: "Player: " + (sherlockEngine.playerName || "")
-                        color: Theme.secondaryColor
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
-
-                    Label {
-                        // If you don’t have difficultyText yet, replace with your mapping from int
-                        text: "Difficulty: " + (sherlockEngine.difficultyText || sherlockEngine.difficulty)
-                        color: Theme.secondaryColor
-                        font.pixelSize: Theme.fontSizeSmall
-                    }
-
-                    Row {
-                        width: parent.width
-                        spacing: Theme.paddingMedium
-
-                        Button {
-                            text: "Next puzzle"
-                            width: (parent.width - Theme.paddingMedium) / 2
-                            onClicked: {
-                                solvedOverlay.close()
-                                sherlockEngine.nextPuzzleAccordingToMode()
-                            }
-                        }
-
-                        Button {
-                            text: "Scores"
-                            width: (parent.width - Theme.paddingMedium) / 2
-                            onClicked: {
-                                solvedOverlay.close()
-                                pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
-                            }
-                        }
-                    }
-                }
-            }
+        Components.SolvedPopup {
+            id: solvedPopup
+            onNextPuzzleRequested: sherlockEngine.nextPuzzleAccordingToMode()
+            onScoresRequested: pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
         }
 
         Column
