@@ -994,9 +994,25 @@ void SherlockEngine::saveState() const
 QVariantList SherlockEngine::boardMasks() const
 {
     QVariantList out;
-    out.reserve(m_size * m_size);
-    for (quint32 m : m_masks)
-        out.push_back(int(m));
+    const int cells = m_size * m_size;
+    out.reserve(cells);
+
+    const quint32 fm = fullMask();
+
+    for (int i = 0; i < cells; ++i) {
+        quint32 m = (i < m_masks.size()) ? (m_masks[i] & fm) : fm;
+
+        // If the cell is a given/fixed, force it to the solution bit so QML
+        // will show the large icon and never hide everything.
+        if (isFixedIndex(i)) {
+            const int sol = (i < m_solution.size()) ? m_solution[i] : 0;
+            m = bit(sol);
+        }
+
+        if (m == 0) m = fm;     // never return 0 to QML
+        out.push_back(uint(m)); // use uint to avoid negative ints
+    }
+
     return out;
 }
 
