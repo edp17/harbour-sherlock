@@ -2148,7 +2148,7 @@ void SherlockEngine::toggleCandidate(int row, int col, int item)
             if (newMask & bit(k)) { chosen = k; break; }
         }
         if (chosen >= 0) {
-            if (m_autoPropagate) propagateCertain(row, col, chosen);
+            propagateCertain(row, col, chosen);
         }
     }
 
@@ -2186,7 +2186,7 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
             if (newMask & bit(k)) { chosen = k; break; }
         }
         if (chosen >= 0) {
-            if (m_autoPropagate) propagateCertain(row, col, chosen);
+            propagateCertain(row, col, chosen);
         }
     }
 
@@ -2246,9 +2246,10 @@ void SherlockEngine::setCertain(int row, int col, int item)
     m_masks[i] = b;
 
     // Propagate constraints
-    if (m_autoPropagate) propagateCertain(row, col, item);
+    propagateCertain(row, col, item);
 
-    // Single notification + persistence
+    // Solve detection + notifications
+    updateSolvedState(true);
     emit boardChanged();
     saveState();
 }
