@@ -607,19 +607,39 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
         m_fixed[i] = 1;
     }
 
-    // Propagate constraints from givens (row/column elimination) — only in assisted mode
-    if (m_autoPropagate) {
-        for (int k = 0; k < givens && k < indices.size(); ++k) {
-            const int i = indices[k];
-            const int r = i / m_size;
-            const int c = i % m_size;
-            const int item = m_solution[i];
-            propagateCertain(r, c, item);
-        }
+    // Build initial candidate masks by removing given items from row/col peers.
+    const quint32 fm = fullMask();
+
+    // Precompute given item in each row/col as bitmasks
+    QVector<quint32> rowTaken(m_size, 0);
+    QVector<quint32> colTaken(m_size, 0);
+
+    for (int i = 0; i < cells; ++i) {
+        if (!m_fixed[i]) continue;
+        const int r = i / m_size;
+        const int c = i % m_size;
+        const quint32 b = m_masks[i] & fm;     // already bit(solution)
+        rowTaken[r] |= b;
+        colTaken[c] |= b;
+    }
+
+    // Apply to non-fixed cells
+    for (int i = 0; i < cells; ++i) {
+        if (m_fixed[i]) continue;
+
+        const int r = i / m_size;
+        const int c = i % m_size;
+
+        quint32 m = fm;
+        m &= ~rowTaken[r];
+        m &= ~colTaken[c];
+
+        if (m == 0) m = fm;     // defensive
+        m_masks[i] = m;
     }
 
     // ---- SANITIZE: never allow 0-mask cells after (re)starting a puzzle ----
-    const quint32 fm = fullMask();
+//    const quint32 fm = fullMask();
 
     // Ensure vectors are at least the right size (defensive)
     if (m_masks.size() != cells) m_masks.resize(cells);
