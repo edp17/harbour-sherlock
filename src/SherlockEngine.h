@@ -192,6 +192,8 @@ public:
     int difficulty() const { return m_difficulty; }
     Q_INVOKABLE void setDifficulty(int d);
 
+    Q_INVOKABLE void nextPuzzleAccordingToMode();
+
 signals:
     void sizeChanged();
     void boardChanged();

@@ -118,6 +118,15 @@ int SherlockEngine::currentBankPuzzleId() const
     return m_puzzleId;
 }
 
+void SherlockEngine::nextPuzzleAccordingToMode()
+{
+    if (m_puzzleSource == Bank) {
+        nextBankPuzzle();
+    } else {
+        startRandomPuzzle();
+    }
+}
+
 void SherlockEngine::setDifficulty(int d)
 {
     if (d < int(Easy) || d > int(Hard)) d = int(Medium);
