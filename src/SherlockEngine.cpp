@@ -863,12 +863,21 @@ void SherlockEngine::resetCell(int row, int col)
     if (isFixedIndex(i))
         return;
 
-    if (m_masks[i] == fullMask())
-        return;
-
     pushUndoSnapshot();
     clearRedo();
-    setMask(row, col, fullMask());
+    clearConflicts();
+    clearHint();
+
+    // Clear this cell
+    m_masks[i] = fullMask();
+
+    // Recompute the whole row baseline (adds back removed candidates in peers,
+    // but keeps removed candidates that are taken by other certainties in the row)
+    recomputeRowCandidates(row);
+
+    updateSolvedState(true);
+    emit boardChanged();
+    saveState();
 }
 
 void SherlockEngine::setAutoCompleteEnabled(bool on)
@@ -2195,6 +2204,40 @@ void SherlockEngine::eliminateCandidate(int row, int col, int item)
     saveState();
 }
 
+void SherlockEngine::recomputeRowCandidates(int row)
+{
+    if (row < 0 || row >= m_size) return;
+
+    const quint32 fm = fullMask();
+
+    // Collect all "certain" items in this row (fixed givens + user certainties)
+    quint32 taken = 0;
+    for (int c = 0; c < m_size; ++c) {
+        const int i = idx(row, c);
+        const quint32 m = (m_masks[i] & fm);
+        if (m != 0 && ((m & (m - 1)) == 0)) { // singleton => certain
+            taken |= m;
+        }
+    }
+
+    // Baseline for non-certain cells in this row
+    const quint32 baseline = (fm & ~taken);
+
+    for (int c = 0; c < m_size; ++c) {
+        const int i = idx(row, c);
+        if (isFixedIndex(i)) continue; // fixed stays singleton
+
+        quint32 m = (m_masks[i] & fm);
+        const bool certain = (m != 0 && ((m & (m - 1)) == 0));
+        if (certain) continue;         // keep user certainties
+
+        // Not fixed + not certain -> baseline candidates (only remove taken-from-row)
+        quint32 nm = baseline;
+        if (nm == 0) nm = fm;          // defensive
+        m_masks[i] = nm;
+    }
+}
+
 void SherlockEngine::propagateCertain(int row, int col, int item)
 {
     clearConflicts();
@@ -2232,7 +2275,15 @@ void SherlockEngine::setCertain(int row, int col, int item)
     if (m_masks[i] == b) {
         pushUndoSnapshot();
         clearRedo();
-        setMask(row, col, fullMask());   // setMask() already emits/saves
+        clearConflicts();
+        clearHint();
+
+        m_masks[i] = fullMask();
+        recomputeRowCandidates(row);
+
+        updateSolvedState(true);
+        emit boardChanged();
+        saveState();
         return;
     }
 

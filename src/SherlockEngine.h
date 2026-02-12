@@ -281,6 +281,7 @@ private:
 
     void rebuildClues();
     void rebuildDosClues();
+    void recomputeRowCandidates(int row);
 
     void generateSolutionFromSeed(quint32 seed);
 
