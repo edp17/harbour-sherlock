@@ -80,6 +80,11 @@ SherlockEngine::SherlockEngine(QObject *parent)
     connect(&m_gameTimer, &QTimer::timeout, this, [this]() {
         ++m_elapsedSeconds;
         emit elapsedSecondsChanged();
+
+        // Persist periodically so restart resumes correctly even if the user made no moves.
+        if ((m_elapsedSeconds % 5) == 0) {
+            saveState();
+        }
     });
     m_gameTimer.setInterval(1000);
     m_gameTimer.setSingleShot(false);
@@ -352,10 +357,14 @@ void SherlockEngine::timerReset()
 {
     m_gameTimer.stop();
     m_elapsedSeconds = 0;
+
     m_timerRunning = false;
     m_timerArmed = true;     // allow start on first action
+
     emit elapsedSecondsChanged();
     emit timerRunningChanged();
+
+    saveState();             // <<< IMPORTANT: persist reset immediately
 }
 
 void SherlockEngine::timerStart()
@@ -365,6 +374,7 @@ void SherlockEngine::timerStart()
     m_timerRunning = true;
     m_gameTimer.start();
     emit timerRunningChanged();
+    saveState();
 }
 
 void SherlockEngine::timerStop()
@@ -374,6 +384,7 @@ void SherlockEngine::timerStop()
     m_timerRunning = false;
     m_gameTimer.stop();
     emit timerRunningChanged();
+    saveState();
 }
 
 void SherlockEngine::timerOnUserAction()
@@ -956,8 +967,14 @@ void SherlockEngine::loadState()
     emit imagesChanged();
     emit boardChanged();
 
-    // Start timer only if it was running previously and puzzle isn't solved
-    if (timerRunning && !m_solved) {
+    const bool shouldRun = (timerRunning && !m_solved);
+
+    m_timerRunning = shouldRun;
+    m_timerArmed   = !shouldRun;    // if not running, arm so first user action starts it
+
+    emit timerRunningChanged();
+
+    if (shouldRun) {
         m_gameTimer.start();
     } else {
         m_gameTimer.stop();
