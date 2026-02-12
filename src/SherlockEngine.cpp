@@ -1159,46 +1159,33 @@ bool SherlockEngine::applyHiddenSinglesPass(bool &anyChange)
 {
     anyChange = false;
     const int n = m_size;
+    const quint32 fm = fullMask();
     bool changed = false;
 
-    // Hidden singles in rows
+    // Sherlock rule: uniqueness is ROW-only.
+    // Hidden single in a row: an item can only fit in one column of that row.
+
     for (int r = 0; r < n; ++r) {
         for (int item = 0; item < n; ++item) {
             const quint32 b = bit(item);
-            int where = -1;
+            int whereC = -1;
             int count = 0;
+
             for (int c = 0; c < n; ++c) {
                 const int i = r * n + c;
-                if (m_masks[i] & b) {
-                    where = i;
+                const quint32 m = (m_masks[i] & fm);
+                if (m & b) {
+                    whereC = c;
                     if (++count > 1) break;
                 }
             }
-            if (count == 1 && where >= 0) {
-                if (m_masks[where] != b) {
-                    m_masks[where] = b;
-                    changed = true;
-                }
-            }
-        }
-    }
 
-    // Hidden singles in columns
-    for (int c = 0; c < n; ++c) {
-        for (int item = 0; item < n; ++item) {
-            const quint32 b = bit(item);
-            int where = -1;
-            int count = 0;
-            for (int r = 0; r < n; ++r) {
-                const int i = r * n + c;
-                if (m_masks[i] & b) {
-                    where = i;
-                    if (++count > 1) break;
-                }
-            }
-            if (count == 1 && where >= 0) {
-                if (m_masks[where] != b) {
-                    m_masks[where] = b;
+            if (count == 1 && whereC >= 0) {
+                const int i = r * n + whereC;
+                if (m_masks[i] != b) {
+                    m_masks[i] = b;
+                    // Propagate row-only constraint immediately
+                    propagateCertain(r, whereC, item);
                     changed = true;
                 }
             }
@@ -1211,11 +1198,12 @@ bool SherlockEngine::applyHiddenSinglesPass(bool &anyChange)
 
 bool SherlockEngine::tryAutoCompleteTrivialFinish()
 {
-    // Conservative gate: only attempt if close to solved.
-    // "one number tweak" later: change this threshold.
     const int amb = ambiguousCellCount();
     if (amb == 0) return false;
-    if (amb > m_size) return false; // trivial gate (tweak later: amb > 2*m_size is looser
+//    if (amb > m_size) return false; // Conservative/trivial gate (tweak later: amb > 2*m_size is looser
+
+    // More permissive, still conservative: allow up to 3*n ambiguous cells.
+    if (amb > 3 * m_size) return false;
 
     m_inAutoComplete = true;
 
@@ -1231,10 +1219,51 @@ bool SherlockEngine::tryAutoCompleteTrivialFinish()
     // Bound iterations to avoid pathological loops.
     for (int it = 0; it < m_size * m_size; ++it) {
         bool passChanged = false;
-        applyHiddenSinglesPass(passChanged);
+
+        // First, propagate existing singletons
+        if (propagateAllCurrentSingles()) passChanged = true;
+
+        // Then, create new singletons via hidden singles and propagate them
+        bool hiddenChanged = false;
+        applyHiddenSinglesPass(hiddenChanged);
+        if (hiddenChanged) passChanged = true;
+
         if (!passChanged) break;
         anyOverallChange = true;
     }
+
+    auto propagateAllCurrentSingles = [&]() -> bool {
+        const int n = m_size;
+        const quint32 fm = fullMask();
+        bool any = false;
+
+        for (int r = 0; r < n; ++r) {
+            for (int c = 0; c < n; ++c) {
+                const int i = r * n + c;
+                const quint32 m = (m_masks[i] & fm);
+                if (m != 0 && ((m & (m - 1)) == 0)) {
+                    // singleton => propagate row-only
+                    const int item = maskToItem(m);
+                    if (item >= 0 && item < n) {
+                        // propagateCertain only reduces peers; mark change if it actually changes something
+                        // We'll detect change by checking peers before/after.
+                        const QVector<quint32> beforeRow = [&]{
+                            QVector<quint32> v(n);
+                            for (int cc = 0; cc < n; ++cc) v[cc] = m_masks[r*n + cc] & fm;
+                            return v;
+                        }();
+
+                        propagateCertain(r, c, item);
+
+                        for (int cc = 0; cc < n; ++cc) {
+                            if ((m_masks[r*n + cc] & fm) != beforeRow[cc]) { any = true; break; }
+                        }
+                    }
+                }
+            }
+        }
+        return any;
+    };
 
     if (anyOverallChange) {
         emit boardChanged();
