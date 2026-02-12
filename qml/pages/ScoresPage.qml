@@ -16,7 +16,7 @@ Page {
     function puzzleLabel(rec) {
         var src = rec.source
         if (src === "bank") {
-            var id = Number(rec.puzzle)
+            var id = Number(rec.puzzleId)
             if (!isFinite(id)) id = 0
             return "Bank #" + (id + 1)
         }

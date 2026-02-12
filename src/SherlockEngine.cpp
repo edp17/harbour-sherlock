@@ -330,14 +330,14 @@ void SherlockEngine::appendScoreIfSolved()
     rec["elapsedSeconds"] = m_elapsedSeconds;
     rec["timestamp"] = QDateTime::currentDateTimeUtc().toString(Qt::ISODate);
 
-    if (m_puzzleSource == Bank) {
+    if (m_activePuzzleSource == int(Bank)) {
         rec["source"] = "bank";
-        rec["puzzleId"] = m_puzzleId;
+        rec["puzzleId"] = m_activePuzzleId;
         rec["seed"] = 0;
     } else {
         rec["source"] = "random";
         rec["puzzleId"] = -1;
-        rec["seed"] = int(m_puzzleSeed);
+        rec["seed"] = int(m_activePuzzleSeed);
     }
 
     // player name comes from QML setting; we’ll pass it in (next section)
@@ -641,6 +641,10 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
     rebuildClues();
     updateSolvedState(false);
 
+    m_activePuzzleSource = int(m_puzzleSource);
+    m_activePuzzleId = m_puzzleId;
+    m_activePuzzleSeed = m_puzzleSeed;
+
     emit puzzleIdentityChanged();
     emit boardChanged();
     saveState();
@@ -891,6 +895,10 @@ void SherlockEngine::loadState()
         if (m_puzzleSeed == 0) m_puzzleSeed = 1;
     }
     generateSolutionFromSeed(m_puzzleSeed);
+
+    m_activePuzzleSource = int(m_puzzleSource);
+    m_activePuzzleId = m_puzzleId;
+    m_activePuzzleSeed = m_puzzleSeed;
 
     // 2) Icon source (no setter here; avoid saveState recursion during load)
     const int src = s.value(QStringLiteral("iconSource"), int(Generated)).toInt();

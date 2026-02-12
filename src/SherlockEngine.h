@@ -366,4 +366,8 @@ private:
     bool m_inAutoComplete = false;
 
     int m_difficulty { Medium };
+
+    int m_activePuzzleSource = int(GeneratedPuzzle);
+    int m_activePuzzleId = -1;
+    quint32 m_activePuzzleSeed = 0;
 };
