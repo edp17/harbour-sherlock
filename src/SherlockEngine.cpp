@@ -607,40 +607,33 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
         m_fixed[i] = 1;
     }
 
-    // Build initial candidate masks by removing given items from row/col peers.
+    // Build initial candidate masks by removing given items from ROW peers only.
     const quint32 fm = fullMask();
 
-    // Precompute given item in each row/col as bitmasks
+    // Precompute given item(s) in each row as bitmasks
     QVector<quint32> rowTaken(m_size, 0);
-    QVector<quint32> colTaken(m_size, 0);
 
     for (int i = 0; i < cells; ++i) {
         if (!m_fixed[i]) continue;
         const int r = i / m_size;
-        const int c = i % m_size;
-        const quint32 b = m_masks[i] & fm;     // already bit(solution)
+        const quint32 b = (m_masks[i] & fm);  // singleton bit
         rowTaken[r] |= b;
-        colTaken[c] |= b;
     }
 
-    // Apply to non-fixed cells
+    // Apply to non-fixed cells (row-only elimination)
     for (int i = 0; i < cells; ++i) {
         if (m_fixed[i]) continue;
 
         const int r = i / m_size;
-        const int c = i % m_size;
 
-        quint32 m = fm;
+        quint32 m = (m_masks[i] & fm);
         m &= ~rowTaken[r];
-        m &= ~colTaken[c];
 
         if (m == 0) m = fm;     // defensive
         m_masks[i] = m;
     }
 
     // ---- SANITIZE: never allow 0-mask cells after (re)starting a puzzle ----
-//    const quint32 fm = fullMask();
-
     // Ensure vectors are at least the right size (defensive)
     if (m_masks.size() != cells) m_masks.resize(cells);
     if (m_fixed.size() != cells) m_fixed.resize(cells);
@@ -2175,7 +2168,7 @@ void SherlockEngine::propagateCertain(int row, int col, int item)
 {
     clearConflicts();
 
-    // Remove 'item' from all other cells in the same row and column.
+    // Remove 'item' from all other cells in the same row (Sherlock rule: row-only).
 
     // Row peers
     for (int c = 0; c < m_size; ++c) {
@@ -2188,21 +2181,6 @@ void SherlockEngine::propagateCertain(int row, int col, int item)
             const quint32 nm = (m & ~bit(item));
             if (nm != 0) {
                 m_masks[ii] = nm;   // direct write; batch notify happens in caller
-            }
-        }
-    }
-
-    // Column peers
-    for (int r = 0; r < m_size; ++r) {
-        if (r == row) continue;
-        const int ii = idx(r, col);
-        if (isFixedIndex(ii)) continue;
-
-        quint32 m = m_masks[ii];
-        if (m & bit(item)) {
-            const quint32 nm = (m & ~bit(item));
-            if (nm != 0) {
-                m_masks[ii] = nm;
             }
         }
     }
