@@ -105,6 +105,37 @@ SherlockEngine::SherlockEngine(QObject *parent)
     loadSolvedBankFromDisk(m_size);
 }
 
+QVariantList SherlockEngine::boardFixed() const
+{
+    QVariantList out;
+    const int cells = m_size * m_size;
+    out.reserve(cells);
+
+    for (int i = 0; i < cells; ++i) {
+        const bool f = (i < m_fixed.size() && m_fixed[i] != 0);
+        out.push_back(f ? 1 : 0);
+    }
+    return out;
+}
+
+QVariantList SherlockEngine::boardFixedItems() const
+{
+    QVariantList out;
+    const int cells = m_size * m_size;
+    out.reserve(cells);
+
+    for (int i = 0; i < cells; ++i) {
+        const bool f = (i < m_fixed.size() && m_fixed[i] != 0);
+        if (!f) {
+            out.push_back(-1);
+            continue;
+        }
+        const int item = (i < m_solution.size()) ? m_solution[i] : -1;
+        out.push_back(item);
+    }
+    return out;
+}
+
 QString SherlockEngine::solvedBankFilePath(int size) const
 {
     const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);

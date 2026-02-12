@@ -51,6 +51,9 @@ class SherlockEngine : public QObject
     Q_PROPERTY(bool autoCompleteEnabled READ autoCompleteEnabled WRITE setAutoCompleteEnabled NOTIFY autoCompleteEnabledChanged)
     Q_PROPERTY(int difficulty READ difficulty WRITE setDifficulty NOTIFY difficultyChanged)
 
+    Q_PROPERTY(QVariantList boardFixed READ boardFixed NOTIFY boardChanged)
+    Q_PROPERTY(QVariantList boardFixedItems READ boardFixedItems NOTIFY boardChanged)
+
 public:
     enum PuzzleSource { Bank = 0, GeneratedPuzzle = 1 };
     Q_ENUM(PuzzleSource)
@@ -193,6 +196,9 @@ public:
     Q_INVOKABLE void setDifficulty(int d);
 
     Q_INVOKABLE void nextPuzzleAccordingToMode();
+
+    QVariantList boardFixed() const;
+    QVariantList boardFixedItems() const;
 
 signals:
     void sizeChanged();

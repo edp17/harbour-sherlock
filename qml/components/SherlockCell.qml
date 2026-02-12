@@ -32,8 +32,9 @@ Item {
         if (!list || list.length !== n*n) return (1 << n) - 1
         return Number(list[i])
     }
-    readonly property bool fixed: sherlockEngine.fixedAt(rowIndex, colIndex)
-    readonly property int fixedItem: sherlockEngine.fixedItemAt(rowIndex, colIndex)
+    readonly property int cellIndex: rowIndex * root.n + colIndex
+    readonly property bool fixed: sherlockEngine.boardFixed[cellIndex] === 1
+    readonly property int fixedItem: sherlockEngine.boardFixedItems[cellIndex]
     readonly property bool effectiveCertain: root.fixed ? true : root.isCertain
     readonly property int effectiveItem: root.fixed ? fixedItem : certainItem
     readonly property int certainCand: {
