@@ -385,18 +385,27 @@ Page
                 function cIsXbox(c) { return (Number(c.flags) & 2) !== 0 }
 
                 function componentForType(tt) {
-                    // update numeric ids to your enum values
-                    // recommended mapping:
-                    // SameCol=20, NotSameCol=21, SameColXor=22, LeftOf=1, NextTo=23, NotNextTo=24
-                    if (tt === 20) return sameColComp
-                    if (tt === 21) return notSameColComp
-                    if (tt === 22) return sameColXorComp
-                    if (tt === 1)  return leftOfComp
-                    if (tt === 23) return nextToComp
-                    if (tt === 24) return notNextToComp
-                    // fallback: old pair view
+                    // MUST match ClueSemantics.h enum values:
+                    // 1 LeftOf
+                    // 2 SameColumn
+                    // 3 NotSameColumn
+                    // 4 SameColumnXor
+                    // 5 NextTo
+                    // 6 NotNextTo
+                    // 7 IsInCol
+                    // 8 NotInCol
+                    if (tt === 2) return sameColComp
+                    if (tt === 3) return notSameColComp
+                    if (tt === 4) return sameColXorComp
+                    if (tt === 5) return nextToComp
+                    if (tt === 6) return notNextToComp
+                    if (tt === 7) return placementComp
+                    if (tt === 8) return notPlacementComp
+                    if (tt === 1) return leftOfComp
                     return pairComp
                 }
+
+
 
                 // Top: vertical semantic clues
                 Flickable {
@@ -414,6 +423,7 @@ Page
                         Repeater {
                             model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
+                                property int gOrient: Number(modelData.orient)
                                 visible: (Number(modelData.orient) === 0)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
                                 height: cluePanel.clueStripH
@@ -432,6 +442,7 @@ Page
                                             width: parent.width
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
+                                            property int orient: gOrient
                                         }
                                     }
                                 }
@@ -457,6 +468,8 @@ Page
                         Repeater {
                             model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
                             delegate: Rectangle {
+                                property int gOrient: Number(modelData.orient)
+
                                 visible: (Number(modelData.orient) === 1)
                                 width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
                                 height: cluePanel.clueStripH
@@ -475,6 +488,7 @@ Page
                                             width: parent.width
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
+                                            property int orient: gOrient
                                         }
                                     }
                                 }
@@ -503,7 +517,7 @@ Component {
         spacing: Theme.paddingSmall
         // Loader provides property 'c'
         Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-        Label { text: cluePanel.midTextForClue(c, 0); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Label { text: cluePanel.midTextForClue(c, orient); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
         Image { visible: true; source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
     }
 }
