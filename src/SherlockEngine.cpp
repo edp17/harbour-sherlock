@@ -488,12 +488,17 @@ QVariantList SherlockEngine::dosClueGroups() const
             m["type"]  = int(c.sem.type);
             m["a"]     = c.sem.a;
             m["b"]     = c.sem.b;
+            m["c"]     = c.sem.c;
             m["index"] = c.sem.index;
+            m["xMark"] = c.sem.xMark;
             m["given"] = c.sem.given;
+
             m["aRow"]  = c.aRow;
             m["aCol"]  = c.aCol;
             m["bRow"]  = c.bRow;
             m["bCol"]  = c.bCol;
+            m["cRow"]  = c.cRow;
+            m["cCol"]  = c.cCol;
             list.push_back(m);
         }
 
@@ -1737,258 +1742,320 @@ void SherlockEngine::rebuildDosClues()
 
     const int n = m_size;
     const int cells = n * n;
-    if (m_solution.size() != cells) {
+    if (m_solution.size() != cells)
         return;
-    }
 
-    auto stripRngSeed = [&](int orient, int index) -> quint32 {
-        // Deterministic per puzzle + strip
+    auto rngSeed = [&](quint32 salt) -> quint32 {
         quint32 s = (m_puzzleSeed == 0u) ? 1u : m_puzzleSeed;
-        s ^= (quint32(orient) << 24);
-        s ^= (quint32(index) << 8);
+        s ^= salt;
+        s ^= quint32(m_difficulty) * 2654435761u;
         if (s == 0u) s = 1u;
         return s;
     };
 
-    auto shuffledAdjacencyOrder = [&](int orient, int index, int count) -> QVector<int> {
-        QVector<int> v;
-        v.reserve(count);
-        for (int i = 0; i < count; ++i) v.push_back(i);
+    auto nextRand = [&](quint32 &state) -> quint32 {
+        // LCG (deterministic)
+        state = state * 1664525u + 1013904223u;
+        return state;
+    };
 
-        quint32 rng = stripRngSeed(orient, index);
+    auto shuffleVec = [&](QVector<int> &v, quint32 seed) {
+        quint32 st = seed;
         for (int i = v.size() - 1; i > 0; --i) {
-            const int j = bounded(rng, i + 1);
-            std::swap(v[i], v[j]);
-        }
-        return v;
-    };
-
-    // For n>=5: drop exactly 1 adjacency clue per strip (keeps it simple but less revealing).
-    // Difficulty: vary how many adjacency clues we drop from each strip.
-    // adjacency clues per strip is (n - 1)
-    auto dropPerStripForDifficulty = [&](int n) -> int {
-        if (m_difficulty == int(Easy)) {
-            return 0;               // Easy: keep all adjacency clues
-        } else if (m_difficulty == int(Medium)) {
-            return (n >= 5) ? 1 : 0; // Medium: your current behaviour
-        } else {
-            // Hard: fewer clues (but keep at least 1 adjacency if possible)
-            return (n >= 6) ? 2 : 1;
+            int j = int(nextRand(st) % quint32(i + 1));
+            qSwap(v[i], v[j]);
         }
     };
 
-    const int maxDrops = qMax(0, (n - 2));               // ensure at least 1 remains when n>1
-    const int dropPerStrip = qMin(dropPerStripForDifficulty(n), maxDrops);
-    const int keepPerStrip = qMax(0, (n - 1) - dropPerStrip);
-
-    auto placementPerColumnForDifficulty = [&](int n) -> int {
-        // How many "IsInCol" clues to add PER COLUMN stripe
-        if (m_difficulty == int(Easy))   return (n >= 6 ? 2 : 1);
-        if (m_difficulty == int(Medium)) return 1;
-        return 0; // Hard: none (positional only)
+    auto colOf = [&](int row, int item) -> int {
+        // In row 'row', find which column has 'item' in the solution
+        const int base = row * n;
+        for (int c = 0; c < n; ++c) {
+            if (m_solution[base + c] == item)
+                return c;
+        }
+        return -1;
     };
 
-    auto notInColPerColumnForDifficulty = [&](int n) -> int {
-        if (m_difficulty == int(Easy))   return 0;
-        if (m_difficulty == int(Medium)) return 1;
-        return (n >= 6 ? 2 : 1); // Hard
+    auto itemAt = [&](int row, int col) -> int {
+        return m_solution[row * n + col]; // 0..n-1
     };
 
-    // Always one group per column (Vertical)
+    // --- Difficulty knobs (tune later) ---
+    auto vCluesPerStrip = [&]() -> int {
+        if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
+        if (m_difficulty == int(Medium)) return 2;
+        return 1; // Hard
+    };
+
+    auto hCluesPerStrip = [&]() -> int {
+        if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
+        if (m_difficulty == int(Medium)) return 2;
+        return 1; // Hard
+    };
+
+    const int vPer = vCluesPerStrip();
+    const int hPer = hCluesPerStrip();
+
+    // One group per "stripe" as your UI expects: n vertical + n horizontal
     m_dosClueGroups.reserve(2 * n);
-
-    for (int c = 0; c < n; ++c) {
-        SemClueGroup g;
-        g.orient = int(Vertical);
-        g.index = c;
-        g.clues.reserve(n > 1 ? (n - 1) : 0);
-
-        const auto order = shuffledAdjacencyOrder(int(Vertical), c, n - 1);
-        for (int k = 0; k < keepPerStrip && k < order.size(); ++k) {
-            const int r = order[k];
-
-            const int topIdx = (r * n + c);
-            const int botIdx = ((r + 1) * n + c);
-
-            SemClue sc;
-            sc.orient = int(Vertical);
-            sc.index = c;
-            sc.sem.type = ClueType::Above;
-            sc.sem.a = m_solution[topIdx];
-            sc.sem.b = m_solution[botIdx];
-            sc.sem.index = -1;
-            sc.sem.given = true;
-            sc.sem = normalizeClue(sc.sem);
-            sc.aRow = r;
-            sc.aCol = c;
-            sc.bRow = r + 1;
-            sc.bCol = c;
-
-            g.clues.push_back(sc);
-        }
-
-        m_dosClueGroups.push_back(g);
+    for (int idx = 0; idx < n; ++idx) {
+        SemClueGroup vg; vg.orient = int(Vertical);   vg.index = idx;
+        SemClueGroup hg; hg.orient = int(Horizontal); hg.index = idx;
+        m_dosClueGroups.push_back(vg);
+        m_dosClueGroups.push_back(hg);
     }
 
-    // --- Direct placement clues: IsInCol ---
-    // For each column stripe c, pick a few (row,item) pairs whose solution is exactly in that column.
-    const int placementPerCol = placementPerColumnForDifficulty(n);
+    auto vGroupAt = [&](int stripe) -> SemClueGroup* {
+        for (auto &g : m_dosClueGroups)
+            if (g.orient == int(Vertical) && g.index == stripe) return &g;
+        return nullptr;
+    };
+    auto hGroupAt = [&](int stripe) -> SemClueGroup* {
+        for (auto &g : m_dosClueGroups)
+            if (g.orient == int(Horizontal) && g.index == stripe) return &g;
+        return nullptr;
+    };
 
-    if (placementPerCol > 0) {
-        // Deterministic order per puzzle + difficulty + column
-        for (int c = 0; c < n; ++c) {
-            // Collect all candidates for this column: (row r, item x = solution[r,c])
-            QVector<QPair<int,int>> candidates;
-            candidates.reserve(n);
-            for (int r = 0; r < n; ++r) {
-                const int x = m_solution[r * n + c];
-                candidates.push_back(qMakePair(r, x));
-            }
+    // ==========================================================
+    // VERTICAL CLUES (column-relations, DOS types 1..3)
+    // We build each vertical stripe from a REAL column in solution.
+    // Stripe index == column index (0..n-1)
+    // ==========================================================
+    for (int col = 0; col < n; ++col) {
+        SemClueGroup *g = vGroupAt(col);
+        if (!g) continue;
 
-            // Shuffle deterministically (re-use your existing deterministic RNG pattern)
-            // If you already have a seed/PRNG helper in rebuildDosClues(), use that.
-            // Here we use a simple deterministic hash based on puzzleSeed + difficulty + column.
-            quint32 seed = (m_puzzleSeed ^ 0xA341316Cu) + quint32(m_difficulty * 97 + c * 7919);
-            auto nextRand = [&]() -> quint32 {
-                seed = seed * 1664525u + 1013904223u;
-                return seed;
-            };
-            for (int i = candidates.size() - 1; i > 0; --i) {
-                int j = int(nextRand() % quint32(i + 1));
-                qSwap(candidates[i], candidates[j]);
-            }
+        // Collect icons that are in this solution column: (row, item)
+        QVector<QPair<int,int>> inThisCol;
+        inThisCol.reserve(n);
+        for (int r = 0; r < n; ++r) {
+            inThisCol.push_back(qMakePair(r, itemAt(r, col)));
+        }
 
-            // Add up to placementPerCol clues into the existing vertical group for column c
-            // Find that group (you built one group per column already)
-            for (int g = 0; g < m_dosClueGroups.size(); ++g) {
-                if (m_dosClueGroups[g].orient == Vertical && m_dosClueGroups[g].index == c) {
-                    int added = 0;
-                    for (int k = 0; k < candidates.size() && added < placementPerCol; ++k) {
-                        const int r = candidates[k].first;
-                        const int x = candidates[k].second;
+        // Deterministic shuffle for variety
+        {
+            QVector<int> order;
+            order.reserve(inThisCol.size());
+            for (int i = 0; i < inThisCol.size(); ++i) order.push_back(i);
+            shuffleVec(order, rngSeed(0x11110000u + quint32(col)));
 
-                        SemClue sc;
-                        sc.orient = Vertical;
-                        sc.index = c;
+            QVector<QPair<int,int>> tmp;
+            tmp.reserve(inThisCol.size());
+            for (int k : order) tmp.push_back(inThisCol[k]);
+            inThisCol = tmp;
+        }
 
-                        sc.sem.type = ClueType::IsInCol;
-                        sc.sem.a = x;
-                        sc.sem.index = c;
-                        sc.sem.given = true;
+        int made = 0;
+        quint32 st = rngSeed(0x22220000u + quint32(col));
 
-                        // For rendering: where the icon “is”
-                        sc.aRow = r;
-                        sc.aCol = c;
-                        sc.bRow = r;
-                        sc.bCol = c;
+        while (made < vPer) {
+            const int pick = int(nextRand(st) % 3u); // 0..2 choose type family
 
-                        m_dosClueGroups[g].clues.push_back(sc);
-                        ++added;
-                    }
-                    break;
+            if (pick == 0) {
+                // (1) Same Column: 2 or 3 images all in same column
+                // Easy: prefer 2; Medium/Hard: sometimes 3
+                const bool want3 = (m_difficulty != int(Easy)) && ((nextRand(st) & 1u) == 0u);
+
+                SemClue sc;
+                sc.orient = int(Vertical);
+                sc.index  = col;
+                sc.sem.given = true;
+
+                sc.sem.type = ClueType::SameCol;
+
+                // a and b always
+                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
+                sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
+
+                // optional c
+                if (want3 && inThisCol.size() >= 3) {
+                    sc.cRow = inThisCol[2].first; sc.cCol = col; sc.sem.c = inThisCol[2].second;
+                    sc.sem.flags = 1; // HAS_C
+                } else {
+                    sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                    sc.sem.flags = 0;
                 }
+
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
+                continue;
             }
-        }
-    }
 
-    // --- Negative placement clues: NotInCol ---
-    const int notInPerCol = notInColPerColumnForDifficulty(n);
+            if (pick == 1) {
+                // (2) Not In Same Column:
+                // 2 icons: not same column
+                // or 3 icons: two are same column, third (X-box) is NOT in that column.
+                const bool want3 = (m_difficulty != int(Easy)) && ((nextRand(st) & 1u) == 0u);
 
-    if (notInPerCol > 0) {
-        for (int c = 0; c < n; ++c) {
-            QVector<QPair<int,int>> candidates;
-            candidates.reserve(n * (n - 1));
+                SemClue sc;
+                sc.orient = int(Vertical);
+                sc.index  = col;
+                sc.sem.given = true;
+                sc.sem.type = ClueType::NotSameCol;
 
-            // Build all valid (row,item) pairs where item is NOT in this column
-            for (int r = 0; r < n; ++r) {
-                const int actualItem = m_solution[r * n + c];
-                for (int x = 0; x < n; ++x) {
-                    if (x == actualItem)
-                        continue; // would contradict IsInCol
+                // choose (a,b) from this column (so they ARE same column)
+                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
 
-                    candidates.push_back(qMakePair(r, x));
+                if (!want3) {
+                    // pick b from a DIFFERENT column (not same column as a)
+                    // simplest: same row as a, take different column's item
+                    const int r = sc.aRow;
+                    int otherCol = int(nextRand(st) % quint32(n));
+                    if (otherCol == col) otherCol = (otherCol + 1) % n;
+
+                    sc.bRow = r; sc.bCol = otherCol; sc.sem.b = itemAt(r, otherCol);
+
+                    sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                    sc.sem.flags = 0;
+                } else {
+                    // b is also in same column (col)
+                    sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
+
+                    // c is the "red-X boxed" one: must NOT be in this column
+                    int r = inThisCol[2].first; // any row
+                    int otherCol = int(nextRand(st) % quint32(n));
+                    if (otherCol == col) otherCol = (otherCol + 1) % n;
+
+                    sc.cRow = r; sc.cCol = otherCol; sc.sem.c = itemAt(r, otherCol);
+
+                    // flags: HAS_C + C_IS_XBOX
+                    sc.sem.flags = 1 | 2;
                 }
+
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
+                continue;
             }
 
-            // Deterministic shuffle
-            quint32 seed = (m_puzzleSeed ^ 0xC8013EA4u)
-                           + quint32(m_difficulty * 131 + c * 3571);
-            auto nextRand = [&]() -> quint32 {
-                seed = seed * 1664525u + 1013904223u;
-                return seed;
-            };
+            {
+                // (3) Same Column As This OR This (XOR):
+                // a shares column with exactly one of b/c.
+                SemClue sc;
+                sc.orient = int(Vertical);
+                sc.index  = col;
+                sc.sem.given = true;
+                sc.sem.type = ClueType::SameColXor;
 
-            for (int i = candidates.size() - 1; i > 0; --i) {
-                int j = int(nextRand() % quint32(i + 1));
-                qSwap(candidates[i], candidates[j]);
+                // a comes from this column
+                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
+
+                // b is in SAME column (col)
+                sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
+
+                // c is NOT in this column (col)
+                int r = inThisCol[2].first;
+                int otherCol = int(nextRand(st) % quint32(n));
+                if (otherCol == col) otherCol = (otherCol + 1) % n;
+
+                sc.cRow = r; sc.cCol = otherCol; sc.sem.c = itemAt(r, otherCol);
+
+                // flags: HAS_C
+                sc.sem.flags = 1;
+
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
+            }
+        }
+    }
+
+    // ==========================================================
+    // HORIZONTAL CLUES (DOS types 4..6)
+    // Stripe index == row index (0..n-1)
+    // ==========================================================
+    for (int row = 0; row < n; ++row) {
+        SemClueGroup *g = hGroupAt(row);
+        if (!g) continue;
+
+        // deterministic per row
+        quint32 st = rngSeed(0x33330000u + quint32(row));
+
+        int made = 0;
+        while (made < hPer) {
+            const int pick = int(nextRand(st) % 3u); // 0..2
+
+            if (pick == 0) {
+                // (4) Is Left Of (unknown distance): pick two different columns
+                int c1 = int(nextRand(st) % quint32(n));
+                int c2 = int(nextRand(st) % quint32(n));
+                if (c1 == c2) c2 = (c2 + 1) % n;
+                if (c1 > c2) qSwap(c1, c2);
+
+                SemClue sc;
+                sc.orient = int(Horizontal);
+                sc.index  = row;
+                sc.sem.type = ClueType::LeftOf;
+                sc.sem.given = true;
+
+                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
+                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
+
+                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                sc.sem.flags = 0;
+
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
+                continue;
             }
 
-            // Inject into the vertical group for column c
-            for (int g = 0; g < m_dosClueGroups.size(); ++g) {
-                if (m_dosClueGroups[g].orient == Vertical &&
-                    m_dosClueGroups[g].index == c) {
+            if (pick == 1) {
+                // (5) Is Next To: adjacent columns
+                int c1 = int(nextRand(st) % quint32(n - 1));
+                int c2 = c1 + 1;
 
-                    int added = 0;
-                    for (int k = 0; k < candidates.size() && added < notInPerCol; ++k) {
-                        const int r = candidates[k].first;
-                        const int x = candidates[k].second;
+                SemClue sc;
+                sc.orient = int(Horizontal);
+                sc.index  = row;
+                sc.sem.type = ClueType::NextTo;
+                sc.sem.given = true;
 
-                        SemClue sc;
-                        sc.orient = Vertical;
-                        sc.index = c;
+                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
+                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
 
-                        sc.sem.type = ClueType::NotInCol;
-                        sc.sem.a = x;
-                        sc.sem.index = c;
-                        sc.sem.given = true;
+                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                sc.sem.flags = 0;
 
-                        sc.aRow = r;
-                        sc.aCol = c;
-                        sc.bRow = r;
-                        sc.bCol = c;
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
+                continue;
+            }
 
-                        m_dosClueGroups[g].clues.push_back(sc);
-                        ++added;
-                    }
-                    break;
+            {
+                // (6) Is Not Next To: pick columns with distance >= 2
+                int c1 = int(nextRand(st) % quint32(n));
+                int c2 = int(nextRand(st) % quint32(n));
+                if (c1 == c2) c2 = (c2 + 2) % n;
+
+                // ensure not adjacent
+                if (qAbs(c1 - c2) == 1) {
+                    c2 = (c2 + 2) % n;
                 }
+                if (c1 > c2) qSwap(c1, c2);
+
+                SemClue sc;
+                sc.orient = int(Horizontal);
+                sc.index  = row;
+                sc.sem.type = ClueType::NotNextTo;
+                sc.sem.given = true;
+
+                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
+                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
+
+                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                sc.sem.flags = 0;
+
+                sc.sem = normalizeClue(sc.sem);
+                g->clues.push_back(sc);
+                ++made;
             }
         }
     }
 
-    // Always one group per row (Horizontal)
-    for (int r = 0; r < n; ++r) {
-        SemClueGroup g;
-        g.orient = int(Horizontal);
-        g.index = r;
-        g.clues.reserve(n > 1 ? (n - 1) : 0);
-
-        const auto order = shuffledAdjacencyOrder(int(Horizontal), r, n - 1);
-        for (int k = 0; k < keepPerStrip && k < order.size(); ++k) {
-            const int c = order[k];
-
-            const int leftIdx  = (r * n + c);
-            const int rightIdx = (r * n + (c + 1));
-
-            SemClue sc;
-            sc.orient = int(Horizontal);
-            sc.index = r;
-            sc.sem.type = ClueType::LeftOf;
-            sc.sem.a = m_solution[leftIdx];
-            sc.sem.b = m_solution[rightIdx];
-            sc.sem.index = -1;
-            sc.sem.given = true;
-            sc.sem = normalizeClue(sc.sem);
-            sc.aRow = r;
-            sc.aCol = c;
-            sc.bRow = r;
-            sc.bCol = c + 1;
-
-            g.clues.push_back(sc);
-        }
-
-        m_dosClueGroups.push_back(g);
-    }
     emit dosClueGroupsChanged();
 }
 

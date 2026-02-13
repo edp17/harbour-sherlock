@@ -4,14 +4,15 @@ static inline void swapInts(int &x, int &y) { int t = x; x = y; y = t; }
 
 ClueSemantic normalizeClue(ClueSemantic c)
 {
-    // For symmetric relations, keep operands ordered
     switch (c.type) {
-    case ClueType::SameRow:
-    case ClueType::SameCol:
-    case ClueType::NotSameRow:
-    case ClueType::NotSameCol:
-        if (c.a > c.b) swapInts(c.a, c.b);
+    case ClueType::SameColumn:
+    case ClueType::NotSameColumn:
+    case ClueType::NextTo:
+    case ClueType::NotNextTo:
+        // For 2-image forms (c.c == -1), enforce a<b for stability
+        if (c.c < 0 && c.a > c.b) swapInts(c.a, c.b);
         break;
+
     default:
         break;
     }

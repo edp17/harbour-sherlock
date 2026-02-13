@@ -380,6 +380,24 @@ Page
                     return (t === 1 || t === 2) // LeftOf / Above
                 }
 
+                function t(c) { return Number(c.type) }
+                function hasC(c) { return (Number(c.flags) & 1) !== 0 }
+                function cIsXbox(c) { return (Number(c.flags) & 2) !== 0 }
+
+                function componentForType(tt) {
+                    // update numeric ids to your enum values
+                    // recommended mapping:
+                    // SameCol=20, NotSameCol=21, SameColXor=22, LeftOf=1, NextTo=23, NotNextTo=24
+                    if (tt === 20) return sameColComp
+                    if (tt === 21) return notSameColComp
+                    if (tt === 22) return sameColXorComp
+                    if (tt === 1)  return leftOfComp
+                    if (tt === 23) return nextToComp
+                    if (tt === 24) return notNextToComp
+                    // fallback: old pair view
+                    return pairComp
+                }
+
                 // Top: vertical semantic clues
                 Flickable {
                     id: verticalClues
@@ -410,43 +428,10 @@ Page
 
                                     Repeater {
                                         model: visible ? modelData.clues : []
-                                        delegate: Row {
-                                            spacing: Theme.paddingSmall
-
-                                            Image {
-                                                width: cluePanel.iconPx
-                                                height: cluePanel.iconPx
-                                                sourceSize.width: cluePanel.iconPx
-                                                sourceSize.height: cluePanel.iconPx
-                                                fillMode: Image.PreserveAspectFit
-                                                cache: true
-                                                asynchronous: true
-                                                smooth: false
-                                                visible: source !== ""
-                                                source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
-                                            }
-
-                                            Label {
-                                                text: cluePanel.midTextForClue(modelData, 0)
-                                                font.pixelSize: Theme.fontSizeTiny
-                                                font.bold: true
-                                                color: cluePanel.textCol
-                                                verticalAlignment: Text.AlignVCenter
-                                            }
-
-                                            // Second icon only for pairwise clues (LeftOf / Above).
-                                            Image {
-                                                width: cluePanel.iconPx
-                                                height: cluePanel.iconPx
-                                                sourceSize.width: cluePanel.iconPx
-                                                sourceSize.height: cluePanel.iconPx
-                                                fillMode: Image.PreserveAspectFit
-                                                cache: true
-                                                asynchronous: true
-                                                smooth: false
-                                                visible: cluePanel.isPairwiseClue(modelData) && source !== ""
-                                                source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
-                                            }
+                                        delegate: Loader {
+                                            width: parent.width
+                                            sourceComponent: cluePanel.componentForType(Number(modelData.type))
+                                            property var c: modelData
                                         }
                                     }
                                 }
@@ -486,42 +471,10 @@ Page
 
                                     Repeater {
                                         model: visible ? modelData.clues : []
-                                        delegate: Row {
-                                            spacing: cluePanel.clueGap
-
-                                            Image {
-                                                width: cluePanel.iconPx
-                                                height: cluePanel.iconPx
-                                                sourceSize.width: cluePanel.iconPx
-                                                sourceSize.height: cluePanel.iconPx
-                                                fillMode: Image.PreserveAspectFit
-                                                cache: true
-                                                asynchronous: true
-                                                smooth: false
-                                                visible: source !== ""
-                                                source: cluePanel.iconSourceFor(modelData.aRow, modelData.a)
-                                            }
-
-                                            Label {
-                                                text: cluePanel.midTextForClue(modelData, 1)
-                                                font.pixelSize: Theme.fontSizeTiny
-                                                font.bold: true
-                                                color: cluePanel.textCol
-                                                verticalAlignment: Text.AlignVCenter
-                                            }
-
-                                            Image {
-                                                width: cluePanel.iconPx
-                                                height: cluePanel.iconPx
-                                                sourceSize.width: cluePanel.iconPx
-                                                sourceSize.height: cluePanel.iconPx
-                                                fillMode: Image.PreserveAspectFit
-                                                cache: true
-                                                asynchronous: true
-                                                smooth: false
-                                                visible: cluePanel.isPairwiseClue(modelData) && source !== ""
-                                                source: cluePanel.iconSourceFor(modelData.bRow, modelData.b)
-                                            }
+                                        delegate: Loader {
+                                            width: parent.width
+                                            sourceComponent: cluePanel.componentForType(Number(modelData.type))
+                                            property var c: modelData
                                         }
                                     }
                                 }
@@ -529,6 +482,162 @@ Page
                         }
                     }
                 }
+
+Component {
+    id: iconImg
+    Image {
+        width: cluePanel.iconPx
+        height: cluePanel.iconPx
+        sourceSize.width: cluePanel.iconPx
+        sourceSize.height: cluePanel.iconPx
+        fillMode: Image.PreserveAspectFit
+        cache: true
+        asynchronous: true
+        smooth: false
+    }
+}
+
+Component {
+    id: pairComp
+    Row {
+        spacing: Theme.paddingSmall
+        // Loader provides property 'c'
+        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        Label { text: cluePanel.midTextForClue(c, 0); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Image { visible: true; source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+    }
+}
+
+Component {
+    id: sameColComp
+    Row {
+        spacing: Theme.paddingSmall
+        Column {
+            spacing: Theme.paddingSmall
+            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+            Label { text: "↕"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; horizontalAlignment: Text.AlignHCenter; width: cluePanel.iconPx }
+            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        }
+        // optional third icon (3 images in same column)
+        Item {
+            visible: cluePanel.hasC(c)
+            width: visible ? (cluePanel.iconPx + Theme.paddingSmall) : 0
+            height: cluePanel.iconPx
+            Image {
+                anchors.verticalCenter: parent.verticalCenter
+                source: cluePanel.iconSourceFor(c.cRow, c.c)
+                width: cluePanel.iconPx
+                height: cluePanel.iconPx
+                sourceSize.width: cluePanel.iconPx
+                sourceSize.height: cluePanel.iconPx
+                fillMode: Image.PreserveAspectFit
+                smooth: false
+            }
+        }
+    }
+}
+
+Component {
+    id: notSameColComp
+    Row {
+        spacing: Theme.paddingSmall
+
+        // Two icons that are NOT in same column (or: two same-column + third excluded)
+        Column {
+            spacing: Theme.paddingSmall
+            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+            Label { text: "✖"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: Theme.errorColor; horizontalAlignment: Text.AlignHCenter; width: cluePanel.iconPx }
+            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        }
+
+        // optional third icon (the red-X boxed one)
+        Item {
+            visible: cluePanel.hasC(c)
+            width: visible ? (cluePanel.iconPx + Theme.paddingSmall) : 0
+            height: cluePanel.iconPx
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: cluePanel.iconPx
+                height: cluePanel.iconPx
+                color: "transparent"
+                border.width: cluePanel.cIsXbox(c) ? 2 : 0
+                border.color: Theme.errorColor
+                Image {
+                    anchors.centerIn: parent
+                    source: cluePanel.iconSourceFor(c.cRow, c.c)
+                    width: cluePanel.iconPx
+                    height: cluePanel.iconPx
+                    sourceSize.width: cluePanel.iconPx
+                    sourceSize.height: cluePanel.iconPx
+                    fillMode: Image.PreserveAspectFit
+                    smooth: false
+                }
+                Label {
+                    visible: cluePanel.cIsXbox(c)
+                    anchors.centerIn: parent
+                    text: "✖"
+                    color: Theme.errorColor
+                    font.pixelSize: Theme.fontSizeTiny
+                    font.bold: true
+                }
+            }
+        }
+    }
+}
+
+Component {
+    id: sameColXorComp
+    Column {
+        spacing: Theme.paddingSmall
+        // top: A
+        Row {
+            spacing: Theme.paddingSmall
+            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+            Label { text: "↕"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+            Label { text: "OR"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        }
+        // bottom: B and C
+        Row {
+            spacing: Theme.paddingSmall
+            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+            Label { text: " / "; font.pixelSize: Theme.fontSizeTiny; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+            Image { source: cluePanel.iconSourceFor(c.cRow, c.c); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        }
+    }
+}
+
+Component {
+    id: leftOfComp
+    Row {
+        spacing: Theme.paddingSmall
+        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+    }
+}
+
+Component {
+    id: nextToComp
+    Row {
+        spacing: Theme.paddingSmall
+        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        Label { text: "↔"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+    }
+}
+
+Component {
+    id: notNextToComp
+    Row {
+        spacing: Theme.paddingSmall
+        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        Label { text: "✖"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: Theme.errorColor; verticalAlignment: Text.AlignVCenter }
+        Label { text: "↔"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+    }
+}
+
             }
         }
     }

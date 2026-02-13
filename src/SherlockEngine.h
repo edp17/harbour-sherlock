@@ -316,6 +316,8 @@ private:
         int aCol = 0;
         int bRow = 0;
         int bCol = 0;
+        int cRow = -1;
+        int cCol = -1;
     };
     struct SemClueGroup {
         int orient = Vertical;
