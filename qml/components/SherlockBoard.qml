@@ -14,17 +14,17 @@ Item {
     signal magnifyRequested(int row, int col, int focusItem, real gx, real gy, real gw, real gh)
 
     // Board padding similar to your other apps
-    readonly property real margin: Theme.horizontalPageMargin
+    readonly property real margin: 0
     readonly property real gap: Theme.paddingSmall
 
     width: parent ? parent.width : Screen.width
-    height: grid.implicitHeight + 2 * margin
+    height: grid.implicitHeight
 
     Grid {
         id: grid
         columns: n
-        x: margin
-        y: margin
+        x: 0
+        y: 0
         spacing: gap
 
         readonly property real cellSize: Math.floor((root.width - 2*root.margin - (n-1)*root.gap) / n)

@@ -1215,23 +1215,6 @@ bool SherlockEngine::tryAutoCompleteTrivialFinish()
 
     bool anyOverallChange = false;
 
-    // Repeat forced-only passes until stable.
-    // Bound iterations to avoid pathological loops.
-    for (int it = 0; it < m_size * m_size; ++it) {
-        bool passChanged = false;
-
-        // First, propagate existing singletons
-        if (propagateAllCurrentSingles()) passChanged = true;
-
-        // Then, create new singletons via hidden singles and propagate them
-        bool hiddenChanged = false;
-        applyHiddenSinglesPass(hiddenChanged);
-        if (hiddenChanged) passChanged = true;
-
-        if (!passChanged) break;
-        anyOverallChange = true;
-    }
-
     auto propagateAllCurrentSingles = [&]() -> bool {
         const int n = m_size;
         const quint32 fm = fullMask();
@@ -1264,6 +1247,23 @@ bool SherlockEngine::tryAutoCompleteTrivialFinish()
         }
         return any;
     };
+
+    // Repeat forced-only passes until stable.
+    // Bound iterations to avoid pathological loops.
+    for (int it = 0; it < m_size * m_size; ++it) {
+        bool passChanged = false;
+
+        // First, propagate existing singletons
+        if (propagateAllCurrentSingles()) passChanged = true;
+
+        // Then, create new singletons via hidden singles and propagate them
+        bool hiddenChanged = false;
+        applyHiddenSinglesPass(hiddenChanged);
+        if (hiddenChanged) passChanged = true;
+
+        if (!passChanged) break;
+        anyOverallChange = true;
+    }
 
     if (anyOverallChange) {
         emit boardChanged();

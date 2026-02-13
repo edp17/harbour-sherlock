@@ -170,12 +170,12 @@ Page
         {
             id: column
             width: parent.width
-            spacing: Theme.paddingLarge
+            spacing: Theme.paddingSmall
 
             // First row - header
             Item {
                 width: parent.width
-                height: Theme.itemSizeLarge
+                height: Theme.itemSizeSmall
 
                 Label {
                     id: timerLabel
@@ -207,40 +207,65 @@ Page
             }
 
             // Second row
-            Row {
+            Item {
                 id: bankRow
                 width: parent.width
-                height: Theme.itemSizeMedium
-                anchors.leftMargin: Theme.horizontalPageMargin
-                anchors.rightMargin: Theme.horizontalPageMargin
-                spacing: Theme.paddingMedium
+                height: Theme.itemSizeSmall
 
-                IconButton {
-                    id: leftBtn
-                    icon.source: "image://theme/icon-m-left"
-                    enabled: sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK() && sherlockEngine.puzzleId > 0
-                    onClicked: sherlockEngine.previousBankPuzzle()
-                }
+                readonly property bool isBank: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK())
+                readonly property int  bankId: sherlockEngine.puzzleId
+                readonly property int  bankTotal: sherlockEngine.bankCount()
+                readonly property bool bankSolved: (isBank && sherlockEngine.bankPuzzleSolved(bankId))
 
-                Label {
-                    width: parent.width - leftBtn.width - rightBtn.width - Theme.paddingLarge
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    elide: Text.ElideRight
-                    text: (sherlockEngine.puzzleSource === sherlockEngine.PUZZLE_BANK()
-                           ? ("Bank #" + (sherlockEngine.puzzleId + 1) + "/" + sherlockEngine.bankCount()
-                              + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")")
-                           : ("Seed " + sherlockEngine.puzzleSeed
-                              + "  (" + sherlockEngine.size + "×" + sherlockEngine.size + ")"))
-                    color: Theme.primaryColor
-                    font.pixelSize: Theme.fontSizeSmall
-                }
+                Row {
+                    anchors.fill: parent
+                    anchors.leftMargin: page.margin
+                    anchors.rightMargin: page.margin
+                    spacing: Theme.paddingMedium
 
-                IconButton {
-                    id: rightBtn
-                    icon.source: "image://theme/icon-m-right"
-                    enabled: !sherlockEngine.randomSelected
-                    onClicked: sherlockEngine.nextBankPuzzle()
+                    IconButton {
+                        id: prevBtn
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon.source: "image://theme/icon-m-left"
+                        enabled: bankRow.isBank
+                        onClicked: sherlockEngine.previousBankPuzzle()
+                    }
+
+                    Label {
+                        id: puzzleLabel
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: parent.width - prevBtn.width - nextBtn.width - 2*parent.spacing
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        elide: Text.ElideRight
+                        font.pixelSize: Theme.fontSizeExtraSmall
+                        color: Theme.secondaryColor
+
+                        text: {
+                            var n = sherlockEngine.size
+                            if (bankRow.isBank) {
+                                var total = bankRow.bankTotal > 0 ? bankRow.bankTotal : 1000
+                                var t = "#" + (bankRow.bankId + 1) + "/" + total + " (" + n + "×" + n + ")"
+                                if (bankRow.bankSolved) t += " (Solved!)"
+                                return t
+                            } else {
+                                return "Random (" + n + "×" + n + ")"
+                            }
+                        }
+                    }
+
+                    IconButton {
+                        id: nextBtn
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon.source: "image://theme/icon-m-right"
+
+                        onClicked: {
+                            if (bankRow.isBank)
+                                sherlockEngine.nextBankPuzzle()
+                            else
+                                sherlockEngine.startRandomPuzzle()
+                        }
+                    }
                 }
             }
 
