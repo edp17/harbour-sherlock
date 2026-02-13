@@ -1862,7 +1862,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.index  = col;
                 sc.sem.given = true;
 
-                sc.sem.type = ClueType::SameCol;
+                sc.sem.type = ClueType::SameColumn;
 
                 // a and b always
                 sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
@@ -1893,7 +1893,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.orient = int(Vertical);
                 sc.index  = col;
                 sc.sem.given = true;
-                sc.sem.type = ClueType::NotSameCol;
+                sc.sem.type = ClueType::NotSameColumn;
 
                 // choose (a,b) from this column (so they ARE same column)
                 sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
@@ -1937,7 +1937,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.orient = int(Vertical);
                 sc.index  = col;
                 sc.sem.given = true;
-                sc.sem.type = ClueType::SameColXor;
+                sc.sem.type = ClueType::SameColumnXor;
 
                 // a comes from this column
                 sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
