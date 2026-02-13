@@ -41,6 +41,10 @@ struct ClueSemantic {
     int xMark = -1;
 
     bool given = true;
+    int flags = 0;      // bit0: has C, bit1: C is red-X boxed
+
+    static constexpr int HasC   = 1;
+    static constexpr int CIsXbox = 2;
 };
 
 // Canonicalization (keeps representation stable)

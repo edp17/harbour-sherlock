@@ -492,7 +492,7 @@ QVariantList SherlockEngine::dosClueGroups() const
             m["index"] = c.sem.index;
             m["xMark"] = c.sem.xMark;
             m["given"] = c.sem.given;
-
+            m["flags"] = c.sem.flags;
             m["aRow"]  = c.aRow;
             m["aCol"]  = c.aCol;
             m["bRow"]  = c.bRow;
