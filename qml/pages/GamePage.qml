@@ -405,6 +405,21 @@ Page
                     return pairComp
                 }
 
+//function hasC(c) {
+    // C exists if flags bit0 set, OR if c.c is present and >=0 (defensive)
+//    return (c && (Number(c.flags) & 1) !== 0) || (c && c.c !== undefined && Number(c.c) >= 0)
+//}
+
+//function cIsXbox(c) {
+    // C is X-boxed if flags bit1 set OR xMark == 2 (defensive)
+//    return (c && ((Number(c.flags) & 2) !== 0)) || (c && Number(c.xMark) === 2)
+//}
+
+function itemOfA(c) { return Number(c.a) }
+function itemOfB(c) { return Number(c.b) }
+function itemOfC(c) { return Number(c.c) }
+
+
 
 
                 // Top: vertical semantic clues
@@ -523,29 +538,99 @@ Component {
 }
 
 Component {
-    id: sameColComp
-    Row {
-        spacing: Theme.paddingSmall
-        Column {
-            spacing: Theme.paddingSmall
-            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-            Label { text: "↕"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; horizontalAlignment: Text.AlignHCenter; width: cluePanel.iconPx }
-            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+    id: clueIconTile
+
+    Rectangle {
+        id: tile
+        property int row: 0
+        property int item: 0
+        property bool xbox: false
+
+        width: Theme.itemSizeSmall
+        height: Theme.itemSizeSmall
+        radius: Theme.paddingSmall
+        color: "transparent"
+        border.width: xbox ? 2 : 0
+        border.color: xbox ? "red" : "transparent"
+
+        Image {
+            anchors.centerIn: parent
+//            source: sherlockEngine.iconUrl(tile.row, tile.item, Math.floor(parent.width * 0.9))
+            source: (sherlockEngine.iconSource === 0)
+    ? Qt.resolvedUrl("../assets/generated_icons/" + (use16px ? "icons_16x16/" : "icons_32x32/")
+                     + genBankFile(tile.row, tile.item)
+                     + "?e=" + sherlockEngine.iconEpoch)
+    : ("image://sherlock/" + (use16px ? "16" : "32")
+       + "/" + (tile.row * 6 + tile.item + 1)
+       + "?e=" + sherlockEngine.iconEpoch)
+            fillMode: Image.PreserveAspectFit
         }
-        // optional third icon (3 images in same column)
-        Item {
-            visible: cluePanel.hasC(c)
-            width: visible ? (cluePanel.iconPx + Theme.paddingSmall) : 0
-            height: cluePanel.iconPx
-            Image {
-                anchors.verticalCenter: parent.verticalCenter
-                source: cluePanel.iconSourceFor(c.cRow, c.c)
-                width: cluePanel.iconPx
-                height: cluePanel.iconPx
-                sourceSize.width: cluePanel.iconPx
-                sourceSize.height: cluePanel.iconPx
-                fillMode: Image.PreserveAspectFit
-                smooth: false
+
+        // red X overlay
+        Canvas {
+            anchors.fill: parent
+            visible: tile.xbox
+            onPaint: {
+                var ctx = getContext("2d")
+                ctx.reset()
+                ctx.lineWidth = 3
+                ctx.strokeStyle = "red"
+                ctx.beginPath()
+                ctx.moveTo(6,6); ctx.lineTo(width-6,height-6)
+                ctx.moveTo(width-6,6); ctx.lineTo(6,height-6)
+                ctx.stroke()
+            }
+        }
+    }
+}
+
+Component {
+    id: sameColComp
+
+    Item {
+        width: parent ? parent.width : Theme.itemSizeSmall
+        height: cluePanel.hasC(c) ? (Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2)
+                                  : (Theme.itemSizeSmall * 2 + Theme.paddingSmall)
+
+        Column {
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: Theme.paddingSmall
+
+            Loader {
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.aRow)
+                    item.item = cluePanel.itemOfA(c)
+                    item.xbox = false
+                }
+            }
+
+            // up/down indicator like DOS (double arrow)
+            Label {
+                text: "↕"
+                font.pixelSize: Theme.fontSizeTiny
+                horizontalAlignment: Text.AlignHCenter
+                width: Theme.itemSizeSmall
+            }
+
+            Loader {
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.bRow)
+                    item.item = cluePanel.itemOfB(c)
+                    item.xbox = false
+                }
+            }
+
+            // optional third image (also same column)
+            Loader {
+                visible: cluePanel.hasC(c)
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.cRow)
+                    item.item = cluePanel.itemOfC(c)
+                    item.xbox = false
+                }
             }
         }
     }
@@ -553,46 +638,49 @@ Component {
 
 Component {
     id: notSameColComp
-    Row {
-        spacing: Theme.paddingSmall
 
-        // Two icons that are NOT in same column (or: two same-column + third excluded)
+    Item {
+        width: parent ? parent.width : Theme.itemSizeSmall
+        height: cluePanel.hasC(c) ? (Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2)
+                                  : (Theme.itemSizeSmall * 2 + Theme.paddingSmall)
+
         Column {
+            anchors.horizontalCenter: parent.horizontalCenter
             spacing: Theme.paddingSmall
-            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-            Label { text: "✖"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: Theme.errorColor; horizontalAlignment: Text.AlignHCenter; width: cluePanel.iconPx }
-            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-        }
 
-        // optional third icon (the red-X boxed one)
-        Item {
-            visible: cluePanel.hasC(c)
-            width: visible ? (cluePanel.iconPx + Theme.paddingSmall) : 0
-            height: cluePanel.iconPx
-            Rectangle {
-                anchors.verticalCenter: parent.verticalCenter
-                width: cluePanel.iconPx
-                height: cluePanel.iconPx
-                color: "transparent"
-                border.width: cluePanel.cIsXbox(c) ? 2 : 0
-                border.color: Theme.errorColor
-                Image {
-                    anchors.centerIn: parent
-                    source: cluePanel.iconSourceFor(c.cRow, c.c)
-                    width: cluePanel.iconPx
-                    height: cluePanel.iconPx
-                    sourceSize.width: cluePanel.iconPx
-                    sourceSize.height: cluePanel.iconPx
-                    fillMode: Image.PreserveAspectFit
-                    smooth: false
+            Loader {
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.aRow)
+                    item.item = cluePanel.itemOfA(c)
+                    item.xbox = false
                 }
-                Label {
-                    visible: cluePanel.cIsXbox(c)
-                    anchors.centerIn: parent
-                    text: "✖"
-                    color: Theme.errorColor
-                    font.pixelSize: Theme.fontSizeTiny
-                    font.bold: true
+            }
+
+            Label {
+                // 2-icon variant: show "≠" between them; 3-icon variant: still vertical relation marker
+                text: cluePanel.hasC(c) ? "↕" : "≠"
+                font.pixelSize: Theme.fontSizeTiny
+                horizontalAlignment: Text.AlignHCenter
+                width: Theme.itemSizeSmall
+            }
+
+            Loader {
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.bRow)
+                    item.item = cluePanel.itemOfB(c)
+                    item.xbox = false
+                }
+            }
+
+            Loader {
+                visible: cluePanel.hasC(c)
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.cRow)
+                    item.item = cluePanel.itemOfC(c)
+                    item.xbox = cluePanel.cIsXbox(c)
                 }
             }
         }
@@ -601,21 +689,53 @@ Component {
 
 Component {
     id: sameColXorComp
-    Column {
-        spacing: Theme.paddingSmall
-        // top: A
-        Row {
+
+    Item {
+        width: parent ? parent.width : Theme.itemSizeSmall * 2 + Theme.paddingSmall
+        height: Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2
+
+        Column {
+            anchors.horizontalCenter: parent.horizontalCenter
             spacing: Theme.paddingSmall
-            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-            Label { text: "↕"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-            Label { text: "OR"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-        }
-        // bottom: B and C
-        Row {
-            spacing: Theme.paddingSmall
-            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-            Label { text: " / "; font.pixelSize: Theme.fontSizeTiny; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-            Image { source: cluePanel.iconSourceFor(c.cRow, c.c); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+
+            Loader {
+                sourceComponent: clueIconTile
+                onLoaded: {
+                    item.row = Number(c.aRow)
+                    item.item = cluePanel.itemOfA(c)
+                    item.xbox = false
+                }
+            }
+
+            // show “OR” like DOS uses implicit “either/or”
+            Label {
+                text: "OR"
+                font.pixelSize: Theme.fontSizeTiny
+                horizontalAlignment: Text.AlignHCenter
+                width: Theme.itemSizeSmall
+            }
+
+            Row {
+                spacing: Theme.paddingSmall
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                Loader {
+                    sourceComponent: clueIconTile
+                    onLoaded: {
+                        item.row = Number(c.bRow)
+                        item.item = cluePanel.itemOfB(c)
+                        item.xbox = false
+                    }
+                }
+                Loader {
+                    sourceComponent: clueIconTile
+                    onLoaded: {
+                        item.row = Number(c.cRow)
+                        item.item = cluePanel.itemOfC(c)
+                        item.xbox = false
+                    }
+                }
+            }
         }
     }
 }
@@ -633,22 +753,41 @@ Component {
 
 Component {
     id: nextToComp
+
     Row {
         spacing: Theme.paddingSmall
-        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-        Label { text: "↔"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        height: Theme.itemSizeSmall
+        anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+
+        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
+        Label { text: cluePanel.hasC(c) ? "⇄" : "↔"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+
+        Loader {
+            visible: cluePanel.hasC(c)
+            sourceComponent: clueIconTile
+            onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=false }
+        }
     }
 }
 
 Component {
     id: notNextToComp
+
     Row {
         spacing: Theme.paddingSmall
-        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-        Label { text: "✖"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: Theme.errorColor; verticalAlignment: Text.AlignVCenter }
-        Label { text: "↔"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+        height: Theme.itemSizeSmall
+        anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+
+        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
+        Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+
+        Loader {
+            visible: cluePanel.hasC(c)
+            sourceComponent: clueIconTile
+            onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=cluePanel.cIsXbox(c) }
+        }
     }
 }
 
