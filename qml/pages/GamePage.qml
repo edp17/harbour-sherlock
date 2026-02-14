@@ -297,11 +297,18 @@ Page
                 width: parent.width
                 spacing: Theme.paddingSmall
 
+                // Bigger icons for clues (separate from board cell rendering)
+                property int iconPx: 40          // 6×6: readable
+                property int tilePad: Theme.paddingSmall
+                property int hTileH: iconPx + tilePad * 2
+                property int vTileH: iconPx * 3 + tilePad * 2 + 4   // room for up to 3 icons
+                property int tileW: iconPx + tilePad * 2
+                property int clueGap: Theme.paddingSmall
+
                 readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
 
-                // Bigger icons for clues (separate from board cell rendering)
-                property int iconPx: Math.max(22, Math.floor(Theme.iconSizeMedium * 0.7))
-                readonly property int clueGap: Math.max(1, Math.floor(Theme.paddingSmall * 0.45))
+
+
 
                 readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
                 readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.20)
@@ -421,8 +428,8 @@ Page
                     width: parent.width
                     height: cluePanel.clueStripH
                     clip: true
-                    contentWidth: vRow.width
-                    contentHeight: vRow.height
+                    contentWidth: vRow.implicitWidth
+                    contentHeight: vRow.implicitHeight
 
                     Row {
                         id: vRow
@@ -466,8 +473,8 @@ Page
                     width: parent.width
                     height: cluePanel.clueStripH
                     clip: true
-                    contentWidth: hRow.width
-                    contentHeight: hRow.height
+                    contentWidth: hRow.implicitWidth
+                    contentHeight: hRow.implicitHeight
 
                     Row {
                         id: hRow
@@ -526,7 +533,7 @@ Page
                         // Loader provides property 'c'
                         Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                         Label { text: cluePanel.midTextForClue(c, orient); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                        Image { visible: true; source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                        Image { visible: true; source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                     }
                 }
 
@@ -548,9 +555,15 @@ Page
 
                         Image {
                             anchors.centerIn: parent
-                source: (sherlockEngine.iconSource === 0)
-                    ? Qt.resolvedUrl("../assets/generated_icons/icons_32x32/" + cluePanel.genIconFileName(tile.row, tile.item))
-                    : ("image://sherlock/32/" + (tile.row * 6 + tile.item + 1) + "?e=" + sherlockEngine.iconEpoch)
+                            width: cluePanel.iconPx
+                            height: cluePanel.iconPx
+                            sourceSize.width: cluePanel.iconPx
+                            sourceSize.height: cluePanel.iconPx
+                            fillMode: Image.PreserveAspectFit
+                            smooth: false
+                            asynchronous: true
+
+                            source: cluePanel.iconSourceFor(tile.row, tile.item)
                         }
 
                         // red X overlay
@@ -595,9 +608,11 @@ Page
                             // up/down indicator like DOS (double arrow)
                             Label {
                                 text: "↕"
-                                font.pixelSize: Theme.fontSizeTiny
+                                width: cluePanel.iconPx
                                 horizontalAlignment: Text.AlignHCenter
-                                width: Theme.itemSizeSmall
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.bold: true
+                                color: cluePanel.textCol
                             }
 
                             Loader {
@@ -647,9 +662,11 @@ Page
                             Label {
                                 // 2-icon variant: show "≠" between them; 3-icon variant: still vertical relation marker
                                 text: cluePanel.hasC(c) ? "↕" : "≠"
-                                font.pixelSize: Theme.fontSizeTiny
+                                width: cluePanel.iconPx
                                 horizontalAlignment: Text.AlignHCenter
-                                width: Theme.itemSizeSmall
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.bold: true
+                                color: cluePanel.textCol
                             }
 
                             Loader {
@@ -697,9 +714,11 @@ Page
                             // show “OR” like DOS uses implicit “either/or”
                             Label {
                                 text: "OR"
-                                font.pixelSize: Theme.fontSizeTiny
+                                width: cluePanel.iconPx * 2 + Theme.paddingSmall
                                 horizontalAlignment: Text.AlignHCenter
-                                width: Theme.itemSizeSmall
+                                font.pixelSize: Theme.fontSizeSmall
+                                font.bold: true
+                                color: cluePanel.textCol
                             }
 
                             Row {
@@ -734,7 +753,7 @@ Page
                         Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                         Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
                         Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                     }
                 }
 
