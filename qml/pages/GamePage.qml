@@ -170,7 +170,7 @@ Page
         {
             id: column
             width: parent.width
-            spacing: Theme.paddingSmall
+            spacing: 2//Theme.paddingSmall
 
             // First row - header
             Item {
@@ -295,7 +295,7 @@ Page
             Column {
                 id: cluePanel
                 width: parent.width
-                spacing: Theme.paddingSmall
+                spacing: 2//Theme.paddingSmall
 
                 // Bigger icons for clues (separate from board cell rendering)
                 property int tilePad: Theme.paddingSmall
@@ -307,7 +307,10 @@ Page
                 property int iconPx: Math.round(tilePx * 0.78)
                 property int clueGap: Theme.paddingSmall
 
-                property int clueStripH: tilePx * 3 + Theme.paddingLarge * 2
+//                property int clueStripH: tilePx * 3 + Theme.paddingLarge * 2
+property int clueStripH: cluePanel.tilePx * 3
+                          + Math.round(cluePanel.tilePx * 0.35)
+                          + 10
                 property int groupW: tilePx * 3 + Theme.paddingLarge
 
                 readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
@@ -449,7 +452,7 @@ Page
 
                     Row {
                         id: vRow
-                        spacing: Theme.paddingSmall
+                        spacing: 2//Theme.paddingSmall
 
                         Repeater {
                             model: cluePanel.vGroups()
@@ -501,7 +504,7 @@ Page
 
                     Row {
                         id: hRow
-                        spacing: Theme.paddingSmall
+                        spacing: 2//Theme.paddingSmall
 
                         Repeater {
                             model: cluePanel.hGroups()
@@ -556,7 +559,7 @@ Page
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: Theme.paddingSmall
+                            spacing: 2//Theme.paddingSmall
 
                             // Loader provides property 'c'
                             Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
@@ -616,13 +619,14 @@ Page
 
                     Item {
                         width: parent ? parent.width : Theme.itemSizeSmall
-                        height: cluePanel.hasC(c)
-                                ? (cluePanel.tilePx * 3 + Theme.paddingSmall * 2)
-                                : (cluePanel.tilePx * 2 + Theme.paddingSmall)
+                        height: (cluePanel.hasC(c) ? 3 : 2) * cluePanel.tilePx
+                                + (cluePanel.hasC(c) ? 3 : 2) * Theme.paddingSmall
+                                + Math.round(cluePanel.tilePx * 0.5)
 
                         Column {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: Theme.paddingSmall
+                            spacing: 2
+                            anchors.top: parent.top
+                            anchors.horizontalCenter: parent.horizontalCente
 
                             Loader {
                                 sourceComponent: clueIconTile
@@ -636,13 +640,13 @@ Page
                             // up/down indicator like DOS (double arrow)
                             Label {
                                 text: "↕"
-                                width: cluePanel.tilePx
-                                height: Theme.itemSizeExtraSmall
-                                horizontalAlignment: Text.AlignHCenter
-                                verticalAlignment: Text.AlignVCenter
-                                font.pixelSize: Theme.fontSizeMedium
-                                font.bold: true
-                                color: cluePanel.textCol
+                              width: cluePanel.tilePx
+                              height: Theme.itemSizeExtraSmall
+                              horizontalAlignment: Text.AlignHCenter
+                              verticalAlignment: Text.AlignVCenter
+                              font.pixelSize: Theme.fontSizeMedium
+                              font.bold: true
+                              color: cluePanel.textCol
                             }
 
                             Loader {
@@ -673,13 +677,14 @@ Page
 
                     Item {
                         width: parent ? parent.width : Theme.itemSizeSmall
-                        height: cluePanel.hasC(c)
-                                ? (cluePanel.tilePx * 3 + Theme.paddingSmall * 2)
-                                : (cluePanel.tilePx * 2 + Theme.paddingSmall)
+                        height: (cluePanel.hasC(c) ? 3 : 2) * cluePanel.tilePx
+                                + (cluePanel.hasC(c) ? 3 : 2) * Theme.paddingSmall
+                                + Math.round(cluePanel.tilePx * 0.5)
 
                         Column {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: Theme.paddingSmall
+                            spacing: 2
+                            anchors.top: parent.top
+                            anchors.horizontalCenter: parent.horizontalCente
 
                             Loader {
                                 sourceComponent: clueIconTile
@@ -731,7 +736,7 @@ Page
 
                         Column {
                             anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: Theme.paddingSmall
+                            spacing: 2
 
                             Loader {
                                 sourceComponent: clueIconTile
@@ -753,7 +758,7 @@ Page
                             }
 
                             Row {
-                                spacing: Theme.paddingSmall
+                                spacing: 2
                                 anchors.horizontalCenter: parent.horizontalCenter
 
                                 Loader {
@@ -785,10 +790,10 @@ Page
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: Theme.paddingSmall
+                            spacing: 2//Theme.paddingSmall
                             Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                             Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                            Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+//                            Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
                             Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                         }
                     }
@@ -803,7 +808,7 @@ Page
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: Theme.paddingSmall
+                            spacing: 2//Theme.paddingSmall
 
                             Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
                             Label { text: cluePanel.hasC(c) ? "⇄" : "↔"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
@@ -827,10 +832,20 @@ Page
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: Theme.paddingSmall
+                            spacing: 2//Theme.paddingSmall
 
                             Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
-                            Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+//                            Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+Label {
+    text: "≠"
+    width: cluePanel.tilePx
+    height: Math.round(cluePanel.tilePx * 0.35)
+    horizontalAlignment: Text.AlignHCenter
+    verticalAlignment: Text.AlignVCenter
+    font.pixelSize: Math.round(cluePanel.tilePx * 0.32)
+    font.bold: true
+    color: cluePanel.textCol
+}
                             Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
 
                             Loader {
