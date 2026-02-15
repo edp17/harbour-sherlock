@@ -461,15 +461,21 @@ Page
                                 color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
                                 border.width: 1
                                 border.color: cluePanel.stripBorder
+                                clip: true
 
                                 Column {
-                                    anchors.centerIn: parent
+                                    anchors.top: parent.top
+                                    anchors.topMargin: Theme.paddingMedium
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    width: parent.width
+                                    clip: true
                                     spacing: cluePanel.clueGap
 
                                     Repeater {
                                         model: modelData.clues
                                         delegate: Loader {
                                             width: parent.width
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
                                             property int orient: 0
@@ -516,6 +522,7 @@ Page
                                         model: modelData.clues
                                         delegate: Loader {
                                             width: parent.width
+                                            anchors.horizontalCenter: parent.horizontalCenter
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
                                             property int orient: 1
@@ -543,12 +550,19 @@ Page
 
                 Component {
                     id: pairComp
-                    Row {
-                        spacing: Theme.paddingSmall
-                        // Loader provides property 'c'
-                        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-                        Label { text: cluePanel.midTextForClue(c, orient); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                        Image { visible: true; source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                    Item {
+                        width: parent ? parent.width : (cluePanel.groupW - Theme.paddingLarge)
+                        height: cluePanel.tilePx   // one clue row height
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: Theme.paddingSmall
+
+                            // Loader provides property 'c'
+                            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                            Label { text: cluePanel.midTextForClue(c, orient); font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+                            Image { visible: true; source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                        }
                     }
                 }
 
@@ -765,31 +779,41 @@ Page
 
                 Component {
                     id: leftOfComp
-                    Row {
-                        spacing: Theme.paddingSmall
-                        Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
-                        Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                        Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-                        Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                    Item {
+                        width: parent ? parent.width : (cluePanel.groupW - Theme.paddingLarge)
+                        height: cluePanel.tilePx   // one clue row height
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: Theme.paddingSmall
+                            Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                            Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+                            Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
+                            Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
+                        }
                     }
                 }
 
                 Component {
                     id: nextToComp
 
-                    Row {
-                        spacing: Theme.paddingSmall
-                        height: Theme.itemSizeSmall
-                        anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    Item {
+                        width: parent ? parent.width : (cluePanel.groupW - Theme.paddingLarge)
+                        height: cluePanel.tilePx   // one clue row height
 
-                        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
-                        Label { text: cluePanel.hasC(c) ? "⇄" : "↔"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
-                        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: Theme.paddingSmall
 
-                        Loader {
-                            visible: cluePanel.hasC(c)
-                            sourceComponent: clueIconTile
-                            onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=false }
+                            Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
+                            Label { text: cluePanel.hasC(c) ? "⇄" : "↔"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+                            Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+
+                            Loader {
+                                visible: cluePanel.hasC(c)
+                                sourceComponent: clueIconTile
+                                onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=false }
+                            }
                         }
                     }
                 }
@@ -797,19 +821,23 @@ Page
                 Component {
                     id: notNextToComp
 
-                    Row {
-                        spacing: Theme.paddingSmall
-                        height: Theme.itemSizeSmall
-                        anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+                    Item {
+                        width: parent ? parent.width : (cluePanel.groupW - Theme.paddingLarge)
+                        height: cluePanel.tilePx   // one clue row height
 
-                        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
-                        Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
-                        Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: Theme.paddingSmall
 
-                        Loader {
-                            visible: cluePanel.hasC(c)
-                            sourceComponent: clueIconTile
-                            onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=cluePanel.cIsXbox(c) }
+                            Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
+                            Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
+                            Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
+
+                            Loader {
+                                visible: cluePanel.hasC(c)
+                                sourceComponent: clueIconTile
+                                onLoaded: { item.row=Number(c.cRow); item.item=cluePanel.itemOfC(c); item.xbox=cluePanel.cIsXbox(c) }
+                            }
                         }
                     }
                 }
