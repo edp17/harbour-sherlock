@@ -298,17 +298,17 @@ Page
                 spacing: Theme.paddingSmall
 
                 // Bigger icons for clues (separate from board cell rendering)
-                property int iconPx: 40          // 6×6: readable
                 property int tilePad: Theme.paddingSmall
                 property int hTileH: iconPx + tilePad * 2
                 property int vTileH: iconPx * 3 + tilePad * 2 + 4   // room for up to 3 icons
                 property int tileW: iconPx + tilePad * 2
+
+                property int tilePx: Math.max(Theme.itemSizeSmall, Math.round(Theme.itemSizeMedium * 0.85))
+                property int iconPx: Math.round(tilePx * 0.78)
                 property int clueGap: Theme.paddingSmall
 
-                readonly property int clueStripH: (iconPx + clueGap) * (sherlockEngine.size - 1) + Theme.paddingLarge
-
-
-
+                property int clueStripH: tilePx * 3 + Theme.paddingLarge * 2
+                property int groupW: tilePx * 3 + Theme.paddingLarge
 
                 readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
                 readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.20)
@@ -418,6 +418,19 @@ Page
                     return pairComp
                 }
 
+                function vGroups() {
+                    var a = sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
+                    var out = []
+                    for (var i = 0; i < a.length; ++i) if (Number(a[i].orient) === 0) out.push(a[i])
+                    return out
+                }
+                function hGroups() {
+                    var a = sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
+                    var out = []
+                    for (var i = 0; i < a.length; ++i) if (Number(a[i].orient) === 1) out.push(a[i])
+                    return out
+                }
+
                 function itemOfA(c) { return Number(c.a) }
                 function itemOfB(c) { return Number(c.b) }
                 function itemOfC(c) { return Number(c.c) }
@@ -428,19 +441,21 @@ Page
                     width: parent.width
                     height: cluePanel.clueStripH
                     clip: true
-                    contentWidth: vRow.implicitWidth
-                    contentHeight: vRow.implicitHeight
+                    flickableDirection: Flickable.HorizontalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    contentWidth: vRow.width
+                    contentHeight: vRow.height
 
                     Row {
                         id: vRow
                         spacing: Theme.paddingSmall
 
                         Repeater {
-                            model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
+                            model: cluePanel.vGroups()
+
                             delegate: Rectangle {
-                                property int gOrient: Number(modelData.orient)
-                                visible: (Number(modelData.orient) === 0)
-                                width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
+                                width: cluePanel.groupW
                                 height: cluePanel.clueStripH
                                 radius: 0
                                 color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
@@ -452,19 +467,18 @@ Page
                                     spacing: cluePanel.clueGap
 
                                     Repeater {
-                                        model: visible ? modelData.clues : []
+                                        model: modelData.clues
                                         delegate: Loader {
                                             width: parent.width
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
-                                            property int orient: gOrient
+                                            property int orient: 0
                                         }
                                     }
                                 }
                             }
                         }
                     }
-
                 }
 
                 // Bottom: horizontal semantic clues
@@ -473,20 +487,21 @@ Page
                     width: parent.width
                     height: cluePanel.clueStripH
                     clip: true
-                    contentWidth: hRow.implicitWidth
-                    contentHeight: hRow.implicitHeight
+                    flickableDirection: Flickable.HorizontalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    contentWidth: hRow.width
+                    contentHeight: hRow.height
 
                     Row {
                         id: hRow
-                        spacing: cluePanel.clueGap
+                        spacing: Theme.paddingSmall
 
                         Repeater {
-                            model: sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups.concat([]) : []
-                            delegate: Rectangle {
-                                property int gOrient: Number(modelData.orient)
+                            model: cluePanel.hGroups()
 
-                                visible: (Number(modelData.orient) === 1)
-                                width: cluePanel.iconPx * 3 + Theme.paddingLarge// * 2
+                            delegate: Rectangle {
+                                width: cluePanel.groupW
                                 height: cluePanel.clueStripH
                                 radius: 0
                                 color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
@@ -498,12 +513,12 @@ Page
                                     spacing: cluePanel.clueGap
 
                                     Repeater {
-                                        model: visible ? modelData.clues : []
+                                        model: modelData.clues
                                         delegate: Loader {
                                             width: parent.width
                                             sourceComponent: cluePanel.componentForType(Number(modelData.type))
                                             property var c: modelData
-                                            property int orient: gOrient
+                                            property int orient: 1
                                         }
                                     }
                                 }
@@ -546,8 +561,8 @@ Page
                         property int item: 0
                         property bool xbox: false
 
-                        width: Theme.itemSizeSmall
-                        height: Theme.itemSizeSmall
+                        width: cluePanel.tilePx
+                        height: cluePanel.tilePx
                         radius: Theme.paddingSmall
                         color: "transparent"
                         border.width: xbox ? 2 : 0
@@ -562,11 +577,9 @@ Page
                             fillMode: Image.PreserveAspectFit
                             smooth: false
                             asynchronous: true
-
                             source: cluePanel.iconSourceFor(tile.row, tile.item)
                         }
 
-                        // red X overlay
                         Canvas {
                             anchors.fill: parent
                             visible: tile.xbox
@@ -589,8 +602,9 @@ Page
 
                     Item {
                         width: parent ? parent.width : Theme.itemSizeSmall
-                        height: cluePanel.hasC(c) ? (Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2)
-                                                  : (Theme.itemSizeSmall * 2 + Theme.paddingSmall)
+                        height: cluePanel.hasC(c)
+                                ? (cluePanel.tilePx * 3 + Theme.paddingSmall * 2)
+                                : (cluePanel.tilePx * 2 + Theme.paddingSmall)
 
                         Column {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -608,9 +622,11 @@ Page
                             // up/down indicator like DOS (double arrow)
                             Label {
                                 text: "↕"
-                                width: cluePanel.iconPx
+                                width: cluePanel.tilePx
+                                height: Theme.itemSizeExtraSmall
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: Theme.fontSizeSmall
+                                verticalAlignment: Text.AlignVCenter
+                                font.pixelSize: Theme.fontSizeMedium
                                 font.bold: true
                                 color: cluePanel.textCol
                             }
@@ -643,8 +659,9 @@ Page
 
                     Item {
                         width: parent ? parent.width : Theme.itemSizeSmall
-                        height: cluePanel.hasC(c) ? (Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2)
-                                                  : (Theme.itemSizeSmall * 2 + Theme.paddingSmall)
+                        height: cluePanel.hasC(c)
+                                ? (cluePanel.tilePx * 3 + Theme.paddingSmall * 2)
+                                : (cluePanel.tilePx * 2 + Theme.paddingSmall)
 
                         Column {
                             anchors.horizontalCenter: parent.horizontalCenter
