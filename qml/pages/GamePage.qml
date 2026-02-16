@@ -295,7 +295,21 @@ Page
             Column {
                 id: cluePanel
                 width: parent.width
-                spacing: 2//Theme.paddingSmall
+                spacing: 2
+
+                // --- Clue icon sizing (separate from board icons) ---
+                property int clueIconPx: 80
+                property int clueSymbolH: Math.round(clueIconPx * 0.50)
+
+                // Vertical clue tiles should be ~1 icon wide
+                property int vGroupW: clueIconPx + Theme.paddingLarge * 2
+
+                // Horizontal clue tiles must fit up to 3 icons in a row (XOR / 3-icon next-to variants)
+                property int hGroupW: clueIconPx * 3 + Theme.paddingLarge * 2 + Theme.paddingSmall * 2
+
+                // If you still use these names elsewhere:
+                property int tilePx: clueIconPx
+                property int groupW: hGroupW
 
                 // Bigger icons for clues (separate from board cell rendering)
                 property int tilePad: Theme.paddingSmall
@@ -303,15 +317,12 @@ Page
                 property int vTileH: iconPx * 3 + tilePad * 2 + 4   // room for up to 3 icons
                 property int tileW: iconPx + tilePad * 2
 
-                property int tilePx: Math.max(Theme.itemSizeSmall, Math.round(Theme.itemSizeMedium * 0.85))
                 property int iconPx: Math.round(tilePx * 0.78)
-                property int clueGap: Theme.paddingSmall
+                property int clueGap: Math.max(1, Math.round(Theme.paddingSmall * 0.5))
 
-//                property int clueStripH: tilePx * 3 + Theme.paddingLarge * 2
-property int clueStripH: cluePanel.tilePx * 3
-                          + Math.round(cluePanel.tilePx * 0.35)
-                          + 10
-                property int groupW: tilePx * 3 + Theme.paddingLarge
+                property int clueStripH: cluePanel.tilePx * 3
+                                          + Math.round(cluePanel.tilePx * 0.35)
+                                          + 10
 
                 readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
                 readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.20)
@@ -458,7 +469,7 @@ property int clueStripH: cluePanel.tilePx * 3
                             model: cluePanel.vGroups()
 
                             delegate: Rectangle {
-                                width: cluePanel.groupW
+                                width: cluePanel.vGroupW
                                 height: cluePanel.clueStripH
                                 radius: 0
                                 color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
@@ -467,8 +478,7 @@ property int clueStripH: cluePanel.tilePx * 3
                                 clip: true
 
                                 Column {
-                                    anchors.top: parent.top
-                                    anchors.topMargin: Theme.paddingMedium
+                                    anchors.verticalCenter: parent.verticalCenter
                                     anchors.horizontalCenter: parent.horizontalCenter
                                     width: parent.width
                                     clip: true
@@ -510,7 +520,7 @@ property int clueStripH: cluePanel.tilePx * 3
                             model: cluePanel.hGroups()
 
                             delegate: Rectangle {
-                                width: cluePanel.groupW
+                                width: cluePanel.hGroupW
                                 height: cluePanel.clueStripH
                                 radius: 0
                                 color: (modelData.index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
@@ -578,8 +588,8 @@ property int clueStripH: cluePanel.tilePx * 3
                         property int item: 0
                         property bool xbox: false
 
-                        width: cluePanel.tilePx
-                        height: cluePanel.tilePx
+                        width: cluePanel.clueIconPx
+                        height: cluePanel.clueIconPx
                         radius: Theme.paddingSmall
                         color: "transparent"
                         border.width: xbox ? 2 : 0
@@ -619,14 +629,11 @@ property int clueStripH: cluePanel.tilePx * 3
 
                     Item {
                         width: parent ? parent.width : Theme.itemSizeSmall
-                        height: (cluePanel.hasC(c) ? 3 : 2) * cluePanel.tilePx
-                                + (cluePanel.hasC(c) ? 3 : 2) * Theme.paddingSmall
-                                + Math.round(cluePanel.tilePx * 0.5)
+                        height: cluePanel.tilePx * 3 + Theme.itemSizeExtraSmall
 
                         Column {
-                            spacing: 2
-                            anchors.top: parent.top
-                            anchors.horizontalCenter: parent.horizontalCente
+                            spacing: 0
+                            anchors.centerIn: parent
 
                             Loader {
                                 sourceComponent: clueIconTile
@@ -640,13 +647,12 @@ property int clueStripH: cluePanel.tilePx * 3
                             // up/down indicator like DOS (double arrow)
                             Label {
                                 text: "↕"
-                              width: cluePanel.tilePx
-                              height: Theme.itemSizeExtraSmall
-                              horizontalAlignment: Text.AlignHCenter
-                              verticalAlignment: Text.AlignVCenter
-                              font.pixelSize: Theme.fontSizeMedium
-                              font.bold: true
-                              color: cluePanel.textCol
+                                height: cluePanel.clueSymbolH
+                                font.pixelSize: cluePanel.clueSymbolH
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font.bold: true
+                                color: cluePanel.textCol
                             }
 
                             Loader {
@@ -676,52 +682,43 @@ property int clueStripH: cluePanel.tilePx * 3
                     id: notSameColComp
 
                     Item {
-                        width: parent ? parent.width : Theme.itemSizeSmall
-                        height: (cluePanel.hasC(c) ? 3 : 2) * cluePanel.tilePx
-                                + (cluePanel.hasC(c) ? 3 : 2) * Theme.paddingSmall
-                                + Math.round(cluePanel.tilePx * 0.5)
+                        // IMPORTANT: size to content, not to some precomputed constant
+                        width: parent ? parent.width : cluePanel.groupW
+                        height: col.implicitHeight
 
                         Column {
-                            spacing: 2
-                            anchors.top: parent.top
-                            anchors.horizontalCenter: parent.horizontalCente
+                            id: col
+                            anchors.centerIn: parent
+                            spacing: 0
 
+                            // top icon
                             Loader {
                                 sourceComponent: clueIconTile
-                                onLoaded: {
-                                    item.row = Number(c.aRow)
-                                    item.item = cluePanel.itemOfA(c)
-                                    item.xbox = false
-                                }
+                                onLoaded: { item.row = c.aRow; item.item = c.a; item.xbox = false }
                             }
 
+                            // middle symbol (tight)
                             Label {
-                                // 2-icon variant: show "≠" between them; 3-icon variant: still vertical relation marker
                                 text: cluePanel.hasC(c) ? "↕" : "≠"
-                                width: cluePanel.iconPx
+                                height: cluePanel.clueSymbolH
+                                font.pixelSize: cluePanel.clueSymbolH
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: Theme.fontSizeSmall
+                                verticalAlignment: Text.AlignVCenter
                                 font.bold: true
                                 color: cluePanel.textCol
                             }
 
+                            // bottom icon
                             Loader {
                                 sourceComponent: clueIconTile
-                                onLoaded: {
-                                    item.row = Number(c.bRow)
-                                    item.item = cluePanel.itemOfB(c)
-                                    item.xbox = false
-                                }
+                                onLoaded: { item.row = c.bRow; item.item = c.b; item.xbox = false }
                             }
 
+                            // 3-icon variant (the “red X box” one) — ONLY ONE extra icon, not more.
                             Loader {
                                 visible: cluePanel.hasC(c)
                                 sourceComponent: clueIconTile
-                                onLoaded: {
-                                    item.row = Number(c.cRow)
-                                    item.item = cluePanel.itemOfC(c)
-                                    item.xbox = cluePanel.cIsXbox(c)
-                                }
+                                onLoaded: { item.row = c.cRow; item.item = c.c; item.xbox = cluePanel.cIsXbox(c) }
                             }
                         }
                     }
@@ -731,51 +728,43 @@ property int clueStripH: cluePanel.tilePx * 3
                     id: sameColXorComp
 
                     Item {
-                        width: parent ? parent.width : Theme.itemSizeSmall * 2 + Theme.paddingSmall
-                        height: Theme.itemSizeSmall * 3 + Theme.paddingSmall * 2
+                        width: parent ? parent.width : cluePanel.groupW
+                        height: col.implicitHeight
 
                         Column {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            spacing: 2
+                            id: col
+                            anchors.centerIn: parent
+                            spacing: 0
 
+                            // A (top)
                             Loader {
                                 sourceComponent: clueIconTile
-                                onLoaded: {
-                                    item.row = Number(c.aRow)
-                                    item.item = cluePanel.itemOfA(c)
-                                    item.xbox = false
-                                }
+                                onLoaded: { item.row = c.aRow; item.item = c.a; item.xbox = false }
                             }
 
-                            // show “OR” like DOS uses implicit “either/or”
+                            // OR (tight)
                             Label {
                                 text: "OR"
-                                width: cluePanel.iconPx * 2 + Theme.paddingSmall
+                                height: cluePanel.clueSymbolH
+                                font.pixelSize: cluePanel.clueSymbolH
                                 horizontalAlignment: Text.AlignHCenter
-                                font.pixelSize: Theme.fontSizeSmall
+                                verticalAlignment: Text.AlignVCenter
                                 font.bold: true
                                 color: cluePanel.textCol
                             }
 
+                            // B and C (bottom row) — EXACTLY TWO ICONS
                             Row {
-                                spacing: 2
+                                spacing: 0
                                 anchors.horizontalCenter: parent.horizontalCenter
 
                                 Loader {
                                     sourceComponent: clueIconTile
-                                    onLoaded: {
-                                        item.row = Number(c.bRow)
-                                        item.item = cluePanel.itemOfB(c)
-                                        item.xbox = false
-                                    }
+                                    onLoaded: { item.row = c.bRow; item.item = c.b; item.xbox = false }
                                 }
                                 Loader {
                                     sourceComponent: clueIconTile
-                                    onLoaded: {
-                                        item.row = Number(c.cRow)
-                                        item.item = cluePanel.itemOfC(c)
-                                        item.xbox = false
-                                    }
+                                    onLoaded: { item.row = c.cRow; item.item = c.c; item.xbox = false }
                                 }
                             }
                         }
@@ -793,7 +782,6 @@ property int clueStripH: cluePanel.tilePx * 3
                             spacing: 2//Theme.paddingSmall
                             Image { source: cluePanel.iconSourceFor(c.aRow, c.a); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                             Label { text: "⋯"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
-//                            Label { text: "→"; font.pixelSize: Theme.fontSizeTiny; font.bold: true; color: cluePanel.textCol; verticalAlignment: Text.AlignVCenter }
                             Image { source: cluePanel.iconSourceFor(c.bRow, c.b); width: cluePanel.iconPx; height: cluePanel.iconPx; sourceSize.width: cluePanel.iconPx; sourceSize.height: cluePanel.iconPx; fillMode: Image.PreserveAspectFit; smooth: false }
                         }
                     }
@@ -835,17 +823,16 @@ property int clueStripH: cluePanel.tilePx * 3
                             spacing: 2//Theme.paddingSmall
 
                             Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.aRow); item.item=cluePanel.itemOfA(c); item.xbox=false } }
-//                            Label { text: "≠"; font.pixelSize: Theme.fontSizeTiny; verticalAlignment: Text.AlignVCenter }
-Label {
-    text: "≠"
-    width: cluePanel.tilePx
-    height: Math.round(cluePanel.tilePx * 0.35)
-    horizontalAlignment: Text.AlignHCenter
-    verticalAlignment: Text.AlignVCenter
-    font.pixelSize: Math.round(cluePanel.tilePx * 0.32)
-    font.bold: true
-    color: cluePanel.textCol
-}
+                            Label {
+                                text: "≠"
+                                width: cluePanel.tilePx
+                                height: Math.round(cluePanel.tilePx * 0.35)
+                                horizontalAlignment: Text.AlignHCenter
+                                verticalAlignment: Text.AlignVCenter
+                                font.pixelSize: Math.round(cluePanel.tilePx * 0.32)
+                                font.bold: true
+                                color: cluePanel.textCol
+                            }
                             Loader { sourceComponent: clueIconTile; onLoaded: { item.row=Number(c.bRow); item.item=cluePanel.itemOfB(c); item.xbox=false } }
 
                             Loader {
