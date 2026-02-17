@@ -451,7 +451,7 @@ Page
 
 // --- DOS clue strips: fixed (n-1) slots per stripe, 1 clue per slot ---
 QtObject {
-    id: cluePanel
+    id: clueModel
     // icon size relative to board; DO NOT hardcode 80
     readonly property int slotPx: Math.max(44, Math.round(board.width / page.n))   // square slot
     readonly property int iconPx: Math.max(22, Math.round(slotPx * 0.60))          // icon inside slot
@@ -528,23 +528,23 @@ QtObject {
 Flickable {
     id: verticalClues
     width: parent.width
-    height: cluePanel.stripH
+    height: clueModel.stripH
     clip: true
     contentWidth: vRow.width
     contentHeight: vRow.height
 
     Row {
         id: vRow
-        spacing: cluePanel.gap
+        spacing: clueModel.gap
 
         Repeater {
             model: page.n
             delegate: Rectangle {
-                width: cluePanel.stripW
-                height: cluePanel.stripH
-                color: (index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
+                width: clueModel.stripW
+                height: clueModel.stripH
+                color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
                 border.width: 1
-                border.color: cluePanel.stripBorder
+                border.color: clueModel.stripBorder
 
                 Column {
                     anchors.fill: parent
@@ -554,16 +554,16 @@ Flickable {
                         model: page.n - 1
                         delegate: Item {
                             width: parent.width
-                            height: cluePanel.slotPx
+                            height: clueModel.slotPx
 
-                            property var clue: cluePanel.clueAt(0, index, modelData)  // orient 0 = Vertical
+                            property var clue: clueModel.clueAt(0, index, modelData)  // orient 0 = Vertical
 
                             Loader {
                                 anchors.centerIn: parent
-                                sourceComponent: clue ? cluePanel.componentForType(Number(clue.type)) : null
+                                sourceComponent: clue ? clueModel.componentForType(Number(clue.type)) : null
                                 // pass-through
                                 property var clueObj: clue
-                                property int iconPx: cluePanel.iconPx
+                                property int iconPx: clueModel.iconPx
                             }
                         }
                     }
@@ -577,23 +577,23 @@ Flickable {
 Flickable {
     id: horizontalClues
     width: parent.width
-    height: cluePanel.stripH
+    height: clueModel.stripH
     clip: true
     contentWidth: hRow.width
     contentHeight: hRow.height
 
     Row {
         id: hRow
-        spacing: cluePanel.gap
+        spacing: clueModel.gap
 
         Repeater {
             model: page.n
             delegate: Rectangle {
-                width: cluePanel.stripW
-                height: cluePanel.stripH
-                color: (index % 2 === 0) ? cluePanel.stripBg : cluePanel.stripBgAlt
+                width: clueModel.stripW
+                height: clueModel.stripH
+                color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
                 border.width: 1
-                border.color: cluePanel.stripBorder
+                border.color: clueModel.stripBorder
 
                 Column {
                     anchors.fill: parent
@@ -603,15 +603,15 @@ Flickable {
                         model: page.n - 1
                         delegate: Item {
                             width: parent.width
-                            height: cluePanel.slotPx
+                            height: clueModel.slotPx
 
-                            property var clue: cluePanel.clueAt(1, index, modelData) // orient 1 = Horizontal
+                            property var clue: clueModel.clueAt(1, index, modelData) // orient 1 = Horizontal
 
                             Loader {
                                 anchors.centerIn: parent
-                                sourceComponent: clue ? cluePanel.componentForType(Number(clue.type)) : null
+                                sourceComponent: clue ? clueModel.componentForType(Number(clue.type)) : null
                                 property var clueObj: clue
-                                property int iconPx: cluePanel.iconPx
+                                property int iconPx: clueModel.iconPx
                             }
                         }
                     }
@@ -649,7 +649,7 @@ Component {
 
         Image {
             anchors.fill: parent
-            source: cluePanel.iconSourceFor(root.row, root.item)
+            source: clueModel.iconSourceFor(root.row, root.item)
             fillMode: Image.PreserveAspectFit
             sourceSize.width: root.iconPx
             sourceSize.height: root.iconPx
@@ -684,9 +684,9 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
-            Loader { sourceComponent: clueSymbol; onLoaded: { item.sym = "?"; item.px = Math.round(iconPx * 0.55) } }
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueSymbol; onLoaded: { if (!clueObj) return; item.sym = "?"; item.px = Math.round(iconPx * 0.55) } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
         }
     }
 }
@@ -701,14 +701,15 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
 
             // optional third icon if present
             Loader {
                 visible: clueObj.c !== undefined && clueObj.c >= 0
                 sourceComponent: visible ? clueIconTile : null
                 onLoaded: {
+                    if (!clueObj) return
                     item.row = clueObj.cRow
                     item.item = clueObj.c
                     item.iconPx = iconPx
@@ -739,6 +740,7 @@ Component {
                 Loader {
                     sourceComponent: clueIconTile
                     onLoaded: {
+                        if (!clueObj) return
                         var ra = clueObj.aRow, ia = clueObj.a
                         var rb = clueObj.bRow, ib = clueObj.b
                         var rc = clueObj.cRow, ic = clueObj.c
@@ -756,6 +758,7 @@ Component {
                 Loader {
                     sourceComponent: clueIconTile
                     onLoaded: {
+                        if (!clueObj) return
                         var ra = clueObj.aRow, ia = clueObj.a
                         var rb = clueObj.bRow, ib = clueObj.b
                         var rc = clueObj.cRow, ic = clueObj.c
@@ -776,7 +779,7 @@ Component {
             // Symbol row
             Loader {
                 sourceComponent: clueSymbol
-                onLoaded: { item.sym = "≠"; item.px = Math.round(iconPx * 0.55) }
+                onLoaded: { if (!clueObj) return; item.sym = "≠"; item.px = Math.round(iconPx * 0.55) }
             }
 
             // Bottom row: either the "boxed" one (if 3 icons) or just show A+B again? (DOS 2-icon uses just 2 icons, no extra row)
@@ -789,6 +792,7 @@ Component {
                     anchors.centerIn: parent
                     sourceComponent: hasC ? clueIconTile : null
                     onLoaded: {
+                        if (!clueObj) return
                         var which = xboxPos
                         if (which === 0) { item.row = clueObj.aRow; item.item = clueObj.a; }
                         else if (which === 1) { item.row = clueObj.bRow; item.item = clueObj.b; }
@@ -843,23 +847,23 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
             Loader {
                 sourceComponent: clueSymbol
-                onLoaded: { item.sym = "OR"; item.px = Math.round(iconPx * 0.40) }
+                onLoaded: { if (!clueObj) return; item.sym = "OR"; item.px = Math.round(iconPx * 0.40) }
             }
 
             Row {
                 spacing: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+                Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
 
                 Loader {
                     visible: hasC
                     sourceComponent: visible ? clueIconTile : null
-                    onLoaded: { item.row = clueObj.cRow; item.item = clueObj.c; item.iconPx = iconPx }
+                    onLoaded: { if (!clueObj) return; item.row = clueObj.cRow; item.item = clueObj.c; item.iconPx = iconPx }
                 }
             }
         }
@@ -877,7 +881,7 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
             // dots + arrow (DOS style: dots mean unknown distance)
             Column {
@@ -898,7 +902,7 @@ Component {
                 }
             }
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
         }
     }
 }
@@ -918,17 +922,17 @@ Component {
                 spacing: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+                Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
-                Loader { sourceComponent: clueSymbol; onLoaded: { item.sym = "↔"; item.px = Math.round(iconPx * 0.55) } }
+                Loader { sourceComponent: clueSymbol; onLoaded: { if (!clueObj) return; item.sym = "↔"; item.px = Math.round(iconPx * 0.55) } }
 
-                Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+                Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
             }
 
             Loader {
                 visible: hasC
                 sourceComponent: visible ? clueIconTile : null
-                onLoaded: { item.row = clueObj.cRow; item.item = clueObj.c; item.iconPx = iconPx }
+                onLoaded: { if (!clueObj) return; item.row = clueObj.cRow; item.item = clueObj.c; item.iconPx = iconPx }
             }
         }
     }
@@ -949,16 +953,17 @@ Component {
                 spacing: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+                Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
                 Loader {
                     sourceComponent: clueSymbol
-                    onLoaded: { item.sym = hasC ? "·" : "≠"; item.px = Math.round(iconPx * 0.55) }
+                    onLoaded: { if (!clueObj) return; item.sym = hasC ? "·" : "≠"; item.px = Math.round(iconPx * 0.55) }
                 }
 
                 Loader {
                     sourceComponent: clueIconTile
                     onLoaded: {
+                        if (!clueObj) return
                         item.row = hasC ? clueObj.cRow : clueObj.bRow
                         item.item = hasC ? clueObj.c : clueObj.b
                         item.iconPx = iconPx
@@ -971,8 +976,8 @@ Component {
                 spacing: Theme.paddingSmall
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                Loader { sourceComponent: clueSymbol; onLoaded: { item.sym = "≠"; item.px = Math.round(iconPx * 0.50) } }
-                Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
+                Loader { sourceComponent: clueSymbol; onLoaded: { if (!clueObj) return; item.sym = "≠"; item.px = Math.round(iconPx * 0.50) } }
+                Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.bRow; item.item = clueObj.b; item.iconPx = iconPx } }
             }
         }
     }
@@ -988,7 +993,7 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
             Label {
                 text: String(Number(clueObj.index) + 1)
@@ -1011,7 +1016,7 @@ Component {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { sourceComponent: clueIconTile; onLoaded: { item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
+            Loader { sourceComponent: clueIconTile; onLoaded: { if (!clueObj) return; item.row = clueObj.aRow; item.item = clueObj.a; item.iconPx = iconPx } }
 
             Label {
                 text: "≠ " + String(Number(clueObj.index) + 1)
