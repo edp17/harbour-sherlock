@@ -815,7 +815,7 @@ Component {
             if (!L1 || !L2) return
 
             function setLoader(L, row, item) {
-                if (L.item) { L.item.row = row; L.item.item = item; L.item.iconPx = iconPx }
+                if (!L || !L.item) return; if (L.item) { L.item.row = row; L.item.item = item; L.item.iconPx = iconPx }
             }
 
             var hasC2 = hasC
