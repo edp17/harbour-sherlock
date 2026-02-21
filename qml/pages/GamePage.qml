@@ -40,6 +40,11 @@ Page
         }
     }
 
+Connections {
+    target: sherlockEngine
+    onDosClueGroupsChanged: clueModel.rebuildFlat()
+}
+
     Connections {
         target: sherlockEngine
         onSolvedChanged: {
@@ -75,6 +80,7 @@ Page
     }
 
     Component.onCompleted: {
+        clueModel.rebuildFlat()
         sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
         sherlockEngine.setDifficulty(appSettings.difficulty)
@@ -298,7 +304,7 @@ Page
                 spacing: 2
 
                 // --- Clue icon sizing (separate from board icons) ---
-property int clueIconPx: Math.max(24, Math.min(48, Math.floor(Math.min(width, Theme.itemSizeLarge) * 0.55)))
+property int clueIconPx: Math.max(32, Math.min(64, Math.floor(Math.min(width, Theme.itemSizeLarge) * 0.80)))
                 property int clueSymbolH: Math.round(clueIconPx * 0.50)
 
                 // Vertical clue tiles should be ~1 icon wide
@@ -371,12 +377,12 @@ function clueIconSource(row, item) {
 
                 function componentForType(tt) {
                     // MUST match ClueSemantics.h enum values:
-                    // 1 LeftOf        - keep
-                    // 2 SameColumn    - keep
-                    // 3 NotSameColumn - keep
-                    // 4 SameColumnXor - keep
-                    // 5 NextTo        - keep
-                    // 6 NotNextTo     - keep
+                    // 1 LeftOf
+                    // 2 SameColumn
+                    // 3 NotSameColumn
+                    // 4 SameColumnXor
+                    // 5 NextTo
+                    // 6 NotNextTo
                     if (tt === 2) return sameColComp
                     if (tt === 3) return notSameColComp
                     if (tt === 4) return sameColXorComp
@@ -407,8 +413,11 @@ function clueIconSource(row, item) {
 QtObject {
     id: clueModel
     // icon size relative to board; DO NOT hardcode 80
-    readonly property int slotPx: Math.max(44, Math.round(board.width / page.n))   // square slot
-    readonly property int iconPx: Math.max(22, Math.round(slotPx * 0.60))          // icon inside slot
+//    readonly property int slotPx: Math.max(44, Math.round(board.width / page.n))   // square slot
+//    readonly property int iconPx: Math.max(22, Math.round(slotPx * 0.60))          // icon inside slot
+// Slot geometry should follow clue icon size (not board cell size)
+readonly property int iconPx: cluePanel.clueIconPx
+readonly property int slotPx: iconPx + Theme.paddingLarge * 2    // square slot around the icon
     readonly property int stripH: (page.n - 1) * slotPx
     readonly property int stripW: slotPx
     readonly property int gap: Theme.paddingSmall
@@ -416,6 +425,37 @@ QtObject {
     readonly property color stripBg: Theme.rgba(Theme.primaryColor, 0.04)
     readonly property color stripBgAlt: Theme.rgba(Theme.primaryColor, 0.02)
     readonly property color stripBorder: Theme.rgba(Theme.primaryColor, 0.20)
+
+// Flattened clue lists for the new presentation
+property var vFlat: []     // vertical clues (max 18)
+property var hFlat: []     // horizontal clues (no hard cap unless you want one)
+
+// Rebuild flattened lists from sherlockEngine.dosClueGroups
+function rebuildFlat() {
+    var gs = sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups : []
+
+    var v = []
+    var h = []
+
+    for (var i = 0; i < gs.length; ++i) {
+        var g = gs[i]
+        if (!g || !g.clues) continue
+
+        var orient = Number(g.orient)
+        for (var k = 0; k < g.clues.length; ++k) {
+            var c = g.clues[k]
+            if (!c) continue
+            if (orient === 0) v.push(c)
+            else if (orient === 1) h.push(c)
+        }
+    }
+
+    // Keep only first 18 vertical clues (6x3 grid)
+    if (v.length > 18) v = v.slice(0, 18)
+
+    vFlat = v
+    hFlat = h
+}
 
 function clampIconPx(px) {
     // Only these folders exist (and are what your provider supports)
@@ -501,118 +541,147 @@ function iconUrl(row, item, px) {
     }
 }
 
-// Vertical stripes (one per column)
+// Vertical stripes
+// Vertical clues: 6 columns × up to 3 rows (max 18 clues)
 Flickable {
     id: verticalClues
     width: parent.width
-    height: clueModel.stripH
     clip: true
-    contentWidth: vRow.width
-    contentHeight: vRow.height
 
-    Row {
-        id: vRow
-        spacing: clueModel.gap
+    readonly property int cols: page.n                 // 6
+    readonly property int rows: Math.min(3, Math.max(1, Math.ceil(clueModel.vFlat.length / cols)))
 
-        Repeater {                                           //Outer → stripes
-            model: page.n
+    // Tile geometry (one clue per tile)
+    readonly property int tileW: Math.floor((width - clueModel.gap * (cols - 1)) / cols)
+    readonly property int tileH: Math.floor(cluePanel.clueIconPx * 3.9 + Theme.paddingLarge * 2)
+
+    height: rows * tileH + (rows - 1) * clueModel.gap
+
+    contentWidth: width
+    contentHeight: vGrid.height
+
+    Grid {
+        id: vGrid
+        width: parent.width
+        columns: verticalClues.cols
+        columnSpacing: clueModel.gap
+        rowSpacing: clueModel.gap
+
+        // Create a full cols*rows grid so row2/3 exist only when needed
+        Repeater {
+            model: verticalClues.cols * verticalClues.rows
+
             delegate: Rectangle {
-                property int stripeIndex: index
-                width: clueModel.stripW
-                height: clueModel.stripH
+                width: verticalClues.tileW
+                height: verticalClues.tileH
                 color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
                 border.width: 1
                 border.color: clueModel.stripBorder
+                clip: true
 
-                Column {
-                    anchors.fill: parent
-                    spacing: 0
+                // clue for this cell (may be null for padding cells)
+                readonly property var clue: (index < clueModel.vFlat.length) ? clueModel.vFlat[index] : null
+                readonly property var comp: (clue !== null) ? clueModel.componentForType(Number(clue.type)) : null
 
-                    Repeater {                               //Inner → slots
-                        model: page.n - 1
-                        delegate: Item {
-                            width: parent.width
-                            height: clueModel.slotPx
-
-                            property var clue: clueModel.clueAt(0, stripeIndex, modelData)  // orient 0 = Vertical
-
+//                Loader {
+//                    id: vCellLoader
+//                    anchors.centerIn: parent
+//                    active: (comp !== null)
+//                    sourceComponent: comp
+//
+//                    onLoaded: {
+//                        if (!item) return
+//                        item.clueObj = clue
+//
+//                        // Scale-to-fit so wide components (XOR) never overlap tiles
+//                        var sx = parent.width  / Math.max(1, item.width)
+//                        var sy = parent.height / Math.max(1, item.height)
+//                        item.scale = Math.min(1.0, sx, sy)
+//                    }
+//                }
 Loader {
-    id: vClueLoader
-    anchors.centerIn: parent
-
-    readonly property bool hasClue: (clue !== undefined && clue !== null)
-    readonly property var comp: hasClue ? clueModel.componentForType(Number(clue.type)) : null
-
+    id: vCellLoader
+    anchors.top: parent.top
+    anchors.topMargin: Theme.paddingSmall
+    anchors.horizontalCenter: parent.horizontalCenter
     active: (comp !== null)
     sourceComponent: comp
 
-    // keep iconPx available even before item exists (some components bind to it)
-    property int iconPx: clueModel.iconPx
-
     onLoaded: {
-        if (item) item.clueObj = clue
+        if (!item) return
+        item.clueObj = clue
+
+        // Scale-to-fit so wide components never overflow tiles
+//        var sx = parent.width  / Math.max(1, item.width)
+//        var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, item.height)
+//        item.scale = Math.min(1.0, sx, sy)
+var iw = item.implicitWidth  > 0 ? item.implicitWidth  : item.width
+var ih = item.implicitHeight > 0 ? item.implicitHeight : item.height
+var sx = parent.width / Math.max(1, iw)
+var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, ih)
+item.scale = Math.min(1.0, sx, sy)
     }
 }
-                        }
-                    }
-                }
             }
         }
     }
 }
 
-// Horizontal stripes (one per row)
+// Horizontal stripes
+// Horizontal clues: stack vertically; if many → 2 columns (never 6)
 Flickable {
     id: horizontalClues
     width: parent.width
-    height: clueModel.stripH
     clip: true
-    contentWidth: hRow.width
-    contentHeight: hRow.height
 
-    Row {
-        id: hRow
-        spacing: clueModel.gap
+    // 2 columns only when there are "too many"
+    readonly property int cols: (clueModel.hFlat.length > 8) ? 2 : 1
+    readonly property int tileW: Math.floor((width - clueModel.gap * (cols - 1)) / cols)
+    readonly property int tileH: Math.floor(cluePanel.clueIconPx * 1.6 + Theme.paddingLarge)
 
-        Repeater {                                       //Outer → stripes
-            model: page.n
+    height: Math.min( // keep it sane on screen; it can scroll
+               (Math.ceil(clueModel.hFlat.length / cols) * tileH) + (Math.max(0, Math.ceil(clueModel.hFlat.length / cols) - 1) * clueModel.gap),
+               clueModel.stripH
+           )
+
+    contentWidth: width
+    contentHeight: hGrid.height
+
+    Grid {
+        id: hGrid
+        width: parent.width
+        columns: horizontalClues.cols
+        columnSpacing: clueModel.gap
+        rowSpacing: clueModel.gap
+
+        Repeater {
+            model: clueModel.hFlat.length
+
             delegate: Rectangle {
-                property int stripeIndex: index
-                width: clueModel.stripW
-                height: clueModel.stripH
+                width: horizontalClues.tileW
+                height: horizontalClues.tileH
                 color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
                 border.width: 1
                 border.color: clueModel.stripBorder
+                clip: true
 
-                Column {
-                    anchors.fill: parent
-                    spacing: 0
+                readonly property var clue: clueModel.hFlat[index]
+                readonly property var comp: clue ? clueModel.componentForType(Number(clue.type)) : null
 
-                    Repeater {                          //Inner → slots
-                        model: page.n - 1
-                        delegate: Item {
-                            width: parent.width
-                            height: clueModel.slotPx
+                Loader {
+                    id: hCellLoader
+                    anchors.centerIn: parent
+                    active: (comp !== null)
+                    sourceComponent: comp
 
-                            property var clue: clueModel.clueAt(1, stripeIndex, modelData)  // orient 1 = Horizontal
+                    onLoaded: {
+                        if (!item) return
+                        item.clueObj = clue
 
-Loader {
-    id: hClueLoader
-    anchors.centerIn: parent
-
-    readonly property bool hasClue: (clue !== undefined && clue !== null)
-    readonly property var comp: hasClue ? clueModel.componentForType(Number(clue.type)) : null
-
-    active: (comp !== null)
-    sourceComponent: comp
-
-    property int iconPx: clueModel.iconPx
-
-    onLoaded: {
-        if (item) item.clueObj = clue
-    }
-}
-                        }
+                        // Scale-to-fit: LeftOf is wide; ensure it never overflows the tile
+                        var sx = parent.width  / Math.max(1, item.width)
+                        var sy = parent.height / Math.max(1, item.height)
+                        item.scale = Math.min(1.0, sx, sy)
                     }
                 }
             }
@@ -641,7 +710,7 @@ Component {
         id: root
         property int row: 0
         property int item: 0
-        property int iconPx: cluePanel.clueIconPx//24
+        property int iconPx: cluePanel.clueIconPx
 
         width: iconPx
         height: iconPx
@@ -682,7 +751,7 @@ Component {
         height: iconPx * 1.2
 
         property var clueObj: null
-        property int iconPx: cluePanel.clueIconPx//24
+        property int iconPx: cluePanel.clueIconPx
 
         function apply() {
             if (!clueObj) return
@@ -929,64 +998,44 @@ Component {
 
     Item {
         id: root
-        width: cluePanel.clueIconPx * 2.8
-        height: cluePanel.clueIconPx * 2.6
-        clip: true
-
         property var clueObj: null
         property int iconPx: cluePanel.clueIconPx
+
+        // IMPORTANT: do NOT hard-code height/width for XOR.
+        // Let content define it so nothing gets clipped.
+        implicitWidth: col.implicitWidth
+        implicitHeight: col.implicitHeight
 
         function apply() {
             if (!clueObj) return
 
-            if (aLoader.item) {
-                aLoader.item.row = clueObj.aRow
-                aLoader.item.item = clueObj.a
-                aLoader.item.iconPx = iconPx
-            }
-            if (bLoader.item) {
-                bLoader.item.row = clueObj.bRow
-                bLoader.item.item = clueObj.b
-                bLoader.item.iconPx = iconPx
-            }
-            if (cLoader.item) {
-                cLoader.item.row = clueObj.cRow
-                cLoader.item.item = clueObj.c
-                cLoader.item.iconPx = iconPx
-            }
+            if (aLoader.item) { aLoader.item.row = clueObj.aRow; aLoader.item.item = clueObj.a; aLoader.item.iconPx = iconPx }
+            if (bLoader.item) { bLoader.item.row = clueObj.bRow; bLoader.item.item = clueObj.b; bLoader.item.iconPx = iconPx }
+            if (cLoader.item) { cLoader.item.row = clueObj.cRow; cLoader.item.item = clueObj.c; cLoader.item.iconPx = iconPx }
         }
 
         onClueObjChanged: apply()
         Component.onCompleted: apply()
 
         Column {
-            anchors.centerIn: parent
-            spacing: Theme.paddingSmall
+            id: col
+            anchors.left: parent.left
+            anchors.top: parent.top
+            spacing: Math.max(2, Math.floor(iconPx * 0.10))
             visible: !!root.clueObj
 
-            Loader {
-                id: aLoader
-                anchors.horizontalCenter: parent.horizontalCenter
-                sourceComponent: clueIconComp
-                onLoaded: root.apply()
-            }
+            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
 
-            // The DOS clue is conceptually XOR: same column as B OR C (but not both).
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
                 text: "OR"
-                font.pixelSize: Math.max(14, Math.floor(iconPx * 0.35))
+                font.pixelSize: Math.max(12, Math.floor(iconPx * 0.30))
                 font.bold: true
                 color: Theme.primaryColor
             }
 
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.paddingSmall
-
-                Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-                Loader { id: cLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-            }
+            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Loader { id: cLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
         }
     }
 }
