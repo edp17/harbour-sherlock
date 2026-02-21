@@ -1781,6 +1781,151 @@ void SherlockEngine::rebuildDosClues()
         return m_solution[row * n + col]; // 0..n-1
     };
 
+    // --- helpers: pick distinct rows, and a simple retry loop ---
+    auto pickRowExcluding = [&](quint32 &st, int ex0, int ex1, int ex2) -> int {
+        // tries up to 32 times (more than enough for n<=6)
+        for (int tries = 0; tries < 32; ++tries) {
+            int r = int(nextRand(st) % quint32(n));
+            if (r != ex0 && r != ex1 && r != ex2) return r;
+        }
+        // fallback: first allowed
+        for (int r = 0; r < n; ++r) {
+            if (r != ex0 && r != ex1 && r != ex2) return r;
+        }
+        return 0;
+    };
+
+    auto pickDistinctRows2 = [&](quint32 &st, int &r0, int &r1) {
+        r0 = int(nextRand(st) % quint32(n));
+        r1 = pickRowExcluding(st, r0, -1, -1);
+    };
+
+    auto pickDistinctRows3 = [&](quint32 &st, int &r0, int &r1, int &r2) {
+        r0 = int(nextRand(st) % quint32(n));
+        r1 = pickRowExcluding(st, r0, -1, -1);
+        r2 = pickRowExcluding(st, r0, r1, -1);
+    };
+
+
+
+
+
+    auto fixedAt = [&](int row, int col) -> bool {
+        const int idx = row * n + col;
+        return (idx >= 0 && idx < m_fixed.size() && m_fixed[idx] != 0);
+    };
+
+    // For redundancy checks: if a row has a fixed value at a given column,
+    // return the item, else -1.
+    auto fixedItemAt = [&](int row, int col) -> int {
+        const int idx = row * n + col;
+        if (idx < 0 || idx >= m_fixed.size() || idx >= m_masks.size()) return -1;
+        if (m_fixed[idx] == 0) return -1;
+        // m_solution is authoritative, but if you prefer: decode from mask here
+        if (idx >= 0 && idx < m_solution.size()) return m_solution[idx];
+        return -1;
+    };
+
+    // Core: check semantics against solution
+    auto clueHolds = [&](const SemClue &s) -> bool {
+        auto colA = [&]() -> int { return colOf(s.aRow, s.a); };
+        auto colB = [&]() -> int { return colOf(s.bRow, s.b); };
+        auto colC = [&]() -> int { return colOf(s.cRow, s.c); };
+
+        switch (s.type) {
+        case ClueType::SameColumn:        // rule 1
+            return (colA() >= 0 && colA() == colB());
+
+        case ClueType::NotSameColumn:     // rule 2 (2 or 3 icons)
+            if (s.flags & SemClue::HasC) {
+                // A and B same column, C NOT in that column
+                return (colA() >= 0 && colA() == colB() && colC() >= 0 && colC() != colA());
+            } else {
+                return (colA() >= 0 && colB() >= 0 && colA() != colB());
+            }
+
+        case ClueType::SameColumnXor:     // rule 3
+            // A is in same column as exactly ONE of (B,C)
+            {
+                int a = colA(), b = colB(), c = colC();
+                if (a < 0 || b < 0 || c < 0) return false;
+                bool ab = (a == b);
+                bool ac = (a == c);
+                return (ab != ac);
+            }
+
+        case ClueType::LeftOf:            // rule 4
+            // A left of B (distance unknown)
+            {
+                int a = colA(), b = colB();
+                if (a < 0 || b < 0) return false;
+                return a < b;
+            }
+
+        case ClueType::NextTo:            // rule 5 (2 or 3 icons)
+            {
+                int a = colA(), b = colB();
+                if (a < 0 || b < 0) return false;
+                if (!(std::abs(a - b) == 1)) return false;
+                if (s.flags & SemClue::HasC) {
+                    int c = colC();
+                    if (c < 0) return false;
+                    // C is next to B and two away from A (i.e. A-B-C in a line)
+                    return (std::abs(b - c) == 1) && (std::abs(a - c) == 2);
+                }
+                return true;
+            }
+
+        case ClueType::NotNextTo:         // rule 6 (2 or 3 icons)
+            {
+                int a = colA(), b = colB();
+                if (a < 0 || b < 0) return false;
+
+                if (s.flags & SemClue::HasC) {
+                    // A and C have exactly one column between them,
+                    // and B is NOT in that middle column.
+                    int c = colC();
+                    if (c < 0) return false;
+                    if (std::abs(a - c) != 2) return false;
+                    int mid = (a + c) / 2;
+                    return b != mid;
+                } else {
+                    return std::abs(a - b) != 1;
+                }
+            }
+
+        default:
+            return true; // unknown types: don't block here
+        }
+    };
+
+    auto clueIsRedundantWithGivens = [&](const SemClue &s) -> bool {
+        // If the clue involves items whose exact columns are already fixed (givens),
+        // then the clue doesn’t add information and should be skipped for Medium/Hard.
+        // Note: we can infer "item's column" from the fixed cells for that row.
+
+        auto colFixedForItem = [&](int row, int item) -> int {
+            // scan row for a fixed cell that equals this item
+            for (int c = 0; c < n; ++c) {
+                int fi = fixedItemAt(row, c);
+                if (fi == item) return c;
+            }
+            return -1;
+        };
+
+        int ca = colFixedForItem(s.aRow, s.a);
+        int cb = colFixedForItem(s.bRow, s.b);
+        int cc = -1;
+        if (s.flags & SemClue::HasC) cc = colFixedForItem(s.cRow, s.c);
+
+        // If all referenced items already have fixed columns, the clue is redundant.
+        if (ca >= 0 && cb >= 0) {
+            if ((s.flags & SemClue::HasC) && cc >= 0) return true;
+            if (!(s.flags & SemClue::HasC)) return true;
+        }
+        return false;
+    };
+
     // --- Difficulty knobs (tune later) ---
     auto vCluesPerStrip = [&]() -> int {
         if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
@@ -1878,6 +2023,17 @@ void SherlockEngine::rebuildDosClues()
                 }
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -1925,6 +2081,17 @@ void SherlockEngine::rebuildDosClues()
                 }
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -1956,8 +2123,20 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 1;
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
+                continue;
             }
         }
     }
@@ -1997,6 +2176,17 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2020,6 +2210,17 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2050,8 +2251,20 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 sc.sem = normalizeClue(sc.sem);
+
+                // (2) must be true in the solution (prevents contradictions)
+                if (!clueHolds(sc)) {
+                    continue;
+                }
+
+                // (3) avoid trivial clues on Medium/Hard
+                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                    continue;
+                }
+
                 g->clues.push_back(sc);
                 ++made;
+                continue;
             }
         }
     }
