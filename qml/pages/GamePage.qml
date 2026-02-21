@@ -42,7 +42,10 @@ Page
 
 Connections {
     target: sherlockEngine
-    onDosClueGroupsChanged: clueModel.rebuildFlat()
+    onDosClueGroupsChanged: {
+        clueModel.rebuildFlat()
+        clueModel.rebuildHFlat()
+    }
 }
 
     Connections {
@@ -81,6 +84,7 @@ Connections {
 
     Component.onCompleted: {
         clueModel.rebuildFlat()
+        clueModel.rebuildHFlat()
         sherlockEngine.setPlayerName(appSettings.playerName)
         sherlockEngine.setSize(appSettings.boardSize)
         sherlockEngine.setDifficulty(appSettings.difficulty)
@@ -428,7 +432,7 @@ readonly property int slotPx: iconPx + Theme.paddingLarge * 2    // square slot 
 
 // Flattened clue lists for the new presentation
 property var vFlat: []     // vertical clues (max 18)
-property var hFlat: []     // horizontal clues (no hard cap unless you want one)
+property var hFlat: []     // horizontal clues (max 12 shown)
 
 // Rebuild flattened lists from sherlockEngine.dosClueGroups
 function rebuildFlat() {
@@ -454,6 +458,27 @@ function rebuildFlat() {
     if (v.length > 18) v = v.slice(0, 18)
 
     vFlat = v
+    hFlat = h
+}
+
+function rebuildHFlat() {
+    var gs = sherlockEngine.dosClueGroups ? sherlockEngine.dosClueGroups : []
+    var h = []
+
+    for (var i = 0; i < gs.length; ++i) {
+        var g = gs[i]
+        if (!g || !g.clues) continue
+        if (Number(g.orient) !== 1) continue // 1 = horizontal
+
+        for (var k = 0; k < g.clues.length; ++k) {
+            var c = g.clues[k]
+            if (c) h.push(c)
+        }
+    }
+
+    // show at most 3 cols × 4 rows = 12
+    if (h.length > 12) h = h.slice(0, 12)
+
     hFlat = h
 }
 
@@ -553,7 +578,7 @@ Flickable {
 
     // Tile geometry (one clue per tile)
     readonly property int tileW: Math.floor((width - clueModel.gap * (cols - 1)) / cols)
-    readonly property int tileH: Math.floor(cluePanel.clueIconPx * 3.9 + Theme.paddingLarge * 2)
+    readonly property int tileH: Math.floor(cluePanel.clueIconPx * 3.45 + Theme.paddingLarge)
 
     height: rows * tileH + (rows - 1) * clueModel.gap
 
@@ -596,9 +621,6 @@ Loader {
         item.clueObj = clue
 
         // Scale-to-fit so wide components never overflow tiles
-//        var sx = parent.width  / Math.max(1, item.width)
-//        var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, item.height)
-//        item.scale = Math.min(1.0, sx, sy)
 var iw = item.implicitWidth  > 0 ? item.implicitWidth  : item.width
 var ih = item.implicitHeight > 0 ? item.implicitHeight : item.height
 var sx = parent.width / Math.max(1, iw)
@@ -611,35 +633,55 @@ item.scale = Math.min(1.0, sx, sy)
     }
 }
 
+// Clue stripes separator
+Item {
+    width: parent.width
+    height: 8
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: 1
+        color: Theme.highlightColor
+        opacity: 0.22
+    }
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        height: 1
+        color: Theme.secondaryColor
+        opacity: 0.38
+    }
+}
+
 // Horizontal stripes
-// Horizontal clues: stack vertically; if many → 2 columns (never 6)
-Flickable {
+// Horizontal clues: 3 columns × up to 4 rows, left-aligned (max 12)
+Item {
     id: horizontalClues
     width: parent.width
-    clip: true
 
-    // 2 columns only when there are "too many"
-    readonly property int cols: (clueModel.hFlat.length > 8) ? 2 : 1
+    readonly property int cols: 3
+    readonly property int rows: Math.min(4, Math.max(1, Math.ceil(clueModel.hFlat.length / cols)))
+
     readonly property int tileW: Math.floor((width - clueModel.gap * (cols - 1)) / cols)
-    readonly property int tileH: Math.floor(cluePanel.clueIconPx * 1.6 + Theme.paddingLarge)
+    readonly property int tileH: Math.floor(cluePanel.clueIconPx + Theme.paddingLarge)
 
-    height: Math.min( // keep it sane on screen; it can scroll
-               (Math.ceil(clueModel.hFlat.length / cols) * tileH) + (Math.max(0, Math.ceil(clueModel.hFlat.length / cols) - 1) * clueModel.gap),
-               clueModel.stripH
-           )
-
-    contentWidth: width
-    contentHeight: hGrid.height
+    height: rows * tileH + (rows - 1) * clueModel.gap
 
     Grid {
         id: hGrid
+        anchors.left: parent.left
+        anchors.top: parent.top
         width: parent.width
         columns: horizontalClues.cols
         columnSpacing: clueModel.gap
-        rowSpacing: clueModel.gap
+        rowSpacing: Theme.paddingSmall
 
         Repeater {
-            model: clueModel.hFlat.length
+            model: horizontalClues.cols * horizontalClues.rows
 
             delegate: Rectangle {
                 width: horizontalClues.tileW
@@ -649,12 +691,16 @@ Flickable {
                 border.color: clueModel.stripBorder
                 clip: true
 
-                readonly property var clue: clueModel.hFlat[index]
-                readonly property var comp: clue ? clueModel.componentForType(Number(clue.type)) : null
+                readonly property var clue: (index < clueModel.hFlat.length) ? clueModel.hFlat[index] : null
+                readonly property var comp: (clue !== null) ? clueModel.componentForType(Number(clue.type)) : null
 
                 Loader {
                     id: hCellLoader
-                    anchors.centerIn: parent
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.paddingSmall
+                    anchors.top: parent.top
+                    anchors.topMargin: Theme.paddingSmall
+
                     active: (comp !== null)
                     sourceComponent: comp
 
@@ -662,9 +708,11 @@ Flickable {
                         if (!item) return
                         item.clueObj = clue
 
-                        // Scale-to-fit: LeftOf is wide; ensure it never overflows the tile
-                        var sx = parent.width  / Math.max(1, item.width)
-                        var sy = parent.height / Math.max(1, item.height)
+                        // scale-to-fit using implicit size when available
+                        var iw = (item.implicitWidth  && item.implicitWidth  > 0) ? item.implicitWidth  : item.width
+                        var ih = (item.implicitHeight && item.implicitHeight > 0) ? item.implicitHeight : item.height
+                        var sx = (parent.width  - Theme.paddingSmall*2) / Math.max(1, iw)
+                        var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, ih)
                         item.scale = Math.min(1.0, sx, sy)
                     }
                 }
