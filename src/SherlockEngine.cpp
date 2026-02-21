@@ -1781,6 +1781,139 @@ void SherlockEngine::rebuildDosClues()
         return m_solution[row * n + col]; // 0..n-1
     };
 
+    // Helper: does this SemClue have a C item?
+    auto hasC = [&](const SemClue& s) -> bool {
+        return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
+    };
+
+    // Helper: which of a/b/c is marked with the red-X box in the semantic clue
+    // Prefer sem.xMark when present; fallback: if CIsXbox flag is set, treat C as the boxed one.
+    auto xIndex = [&](const SemClue& s) -> int {
+        if (s.sem.xMark >= 0) return s.sem.xMark;                 // 0=a,1=b,2=c
+        if (s.sem.flags & ClueSemantic::CIsXbox) return 2;        // C boxed
+        return -1;
+    };
+
+    // Extract fixed column for (row,item) from current givens (fixed cells).
+    // Returns -1 if that item is not fixed in that row.
+    auto fixedColForItem = [&](int row, int item) -> int {
+        if (row < 0 || row >= n || item < 0 || item >= n) return -1;
+
+        for (int col = 0; col < n; ++col) {
+            const int i = row * n + col;
+            if (i < 0 || i >= m_fixed.size() || i >= m_masks.size()) continue;
+            if (!m_fixed[i]) continue;
+
+            // fixed cell: mask should be singleton; decode which item it is
+            quint32 m = m_masks[i] & fullMask();
+            if (m == 0) continue;
+
+            int fixedItem = -1;
+            for (int k = 0; k < 32; ++k) {
+                if (m & (1u << k)) { fixedItem = k; break; }
+            }
+            if (fixedItem == item) return col;
+        }
+        return -1;
+    };
+
+    // "Holds in solution" validator using *solution* columns (prevents contradictions).
+    auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
+        const int ca = colOf(s.aRow, s.sem.a);
+        const int cb = colOf(s.bRow, s.sem.b);
+        const int cc = hasC(s) ? colOf(s.cRow, s.sem.c) : -1;
+        if (ca < 0 || cb < 0) return false;
+        if (hasC(s) && cc < 0) return false;
+
+        switch (s.sem.type) {
+        case ClueType::SameColumn:
+            if (!hasC(s)) return (ca == cb);
+            return (ca == cb && ca == cc);
+
+        case ClueType::NotSameColumn:
+            if (!hasC(s)) return (ca != cb);
+            {
+                const int xi = xIndex(s);
+                // Two are same column; the X-boxed one is NOT in that column.
+                if (xi == 0) return (cb == cc) && (ca != cb);
+                if (xi == 1) return (ca == cc) && (cb != ca);
+                // default: C is the excluded one
+                return (ca == cb) && (cc != ca);
+            }
+
+        case ClueType::SameColumnXor:
+            // A shares column with exactly one of (B,C)
+            if (!hasC(s)) return false;
+            return ((ca == cb) ^ (ca == cc));
+
+        case ClueType::LeftOf:
+            return (ca < cb);
+
+        case ClueType::NextTo:
+            if (!hasC(s)) return (qAbs(ca - cb) == 1);
+            // 3-image variant: B is next to both A and C, and A/C are 2 apart (B between them)
+            return (qAbs(ca - cb) == 1) && (qAbs(cb - cc) == 1) && (qAbs(ca - cc) == 2);
+
+        case ClueType::NotNextTo:
+            if (!hasC(s)) return (qAbs(ca - cb) != 1);
+            // 3-image variant: A and C have exactly one column between them, and B is NOT in that middle column
+            if (qAbs(ca - cc) != 2) return false;
+            {
+                const int mid = (ca + cc) / 2; // safe because distance is 2 => same parity
+                return (cb != mid);
+            }
+
+        default:
+            return true; // other/legacy types: don't reject
+        }
+    };
+
+    // Redundancy filter: if the clue is already fully implied by givens (fixed cells), skip it.
+    auto clueIsRedundantWithGivens = [&](const SemClue& s) -> bool {
+        const int ca = fixedColForItem(s.aRow, s.sem.a);
+        const int cb = fixedColForItem(s.bRow, s.sem.b);
+        const int cc = hasC(s) ? fixedColForItem(s.cRow, s.sem.c) : -1;
+
+        // If we don't know the columns from givens, we can't call it redundant.
+        if (ca < 0 || cb < 0) return false;
+        if (hasC(s) && cc < 0) return false;
+
+        // Evaluate using the same logic as the solution validator but with known fixed columns
+        switch (s.sem.type) {
+        case ClueType::SameColumn:
+            if (!hasC(s)) return (ca == cb);
+            return (ca == cb && ca == cc);
+
+        case ClueType::NotSameColumn:
+            if (!hasC(s)) return (ca != cb);
+            {
+                const int xi = xIndex(s);
+                if (xi == 0) return (cb == cc) && (ca != cb);
+                if (xi == 1) return (ca == cc) && (cb != ca);
+                return (ca == cb) && (cc != ca);
+            }
+
+        case ClueType::SameColumnXor:
+            if (!hasC(s)) return false;
+            return ((ca == cb) ^ (ca == cc));
+
+        case ClueType::LeftOf:
+            return (ca < cb);
+
+        case ClueType::NextTo:
+            if (!hasC(s)) return (qAbs(ca - cb) == 1);
+            return (qAbs(ca - cb) == 1) && (qAbs(cb - cc) == 1) && (qAbs(ca - cc) == 2);
+
+        case ClueType::NotNextTo:
+            if (!hasC(s)) return (qAbs(ca - cb) != 1);
+            if (qAbs(ca - cc) != 2) return false;
+            return (cb != (ca + cc) / 2);
+
+        default:
+            return false;
+        }
+    };
+
     // --- helpers: pick distinct rows, and a simple retry loop ---
     auto pickRowExcluding = [&](quint32 &st, int ex0, int ex1, int ex2) -> int {
         // tries up to 32 times (more than enough for n<=6)
@@ -1806,10 +1939,6 @@ void SherlockEngine::rebuildDosClues()
         r2 = pickRowExcluding(st, r0, r1, -1);
     };
 
-
-
-
-
     auto fixedAt = [&](int row, int col) -> bool {
         const int idx = row * n + col;
         return (idx >= 0 && idx < m_fixed.size() && m_fixed[idx] != 0);
@@ -1828,16 +1957,16 @@ void SherlockEngine::rebuildDosClues()
 
     // Core: check semantics against solution
     auto clueHolds = [&](const SemClue &s) -> bool {
-        auto colA = [&]() -> int { return colOf(s.aRow, s.a); };
-        auto colB = [&]() -> int { return colOf(s.bRow, s.b); };
-        auto colC = [&]() -> int { return colOf(s.cRow, s.c); };
+        auto colA = [&]() -> int { return colOf(s.aRow, s.sem.a); };
+        auto colB = [&]() -> int { return colOf(s.bRow, s.sem.b); };
+        auto colC = [&]() -> int { return colOf(s.cRow, s.sem.c); };
 
-        switch (s.type) {
+        switch (s.sem.type) {
         case ClueType::SameColumn:        // rule 1
             return (colA() >= 0 && colA() == colB());
 
         case ClueType::NotSameColumn:     // rule 2 (2 or 3 icons)
-            if (s.flags & SemClue::HasC) {
+            if (s.sem.flags & ClueSemantic::HasC) {
                 // A and B same column, C NOT in that column
                 return (colA() >= 0 && colA() == colB() && colC() >= 0 && colC() != colA());
             } else {
@@ -1867,7 +1996,7 @@ void SherlockEngine::rebuildDosClues()
                 int a = colA(), b = colB();
                 if (a < 0 || b < 0) return false;
                 if (!(std::abs(a - b) == 1)) return false;
-                if (s.flags & SemClue::HasC) {
+                if (s.sem.flags & ClueSemantic::HasC) {
                     int c = colC();
                     if (c < 0) return false;
                     // C is next to B and two away from A (i.e. A-B-C in a line)
@@ -1881,7 +2010,7 @@ void SherlockEngine::rebuildDosClues()
                 int a = colA(), b = colB();
                 if (a < 0 || b < 0) return false;
 
-                if (s.flags & SemClue::HasC) {
+                if (s.sem.flags & ClueSemantic::HasC) {
                     // A and C have exactly one column between them,
                     // and B is NOT in that middle column.
                     int c = colC();
@@ -1913,15 +2042,15 @@ void SherlockEngine::rebuildDosClues()
             return -1;
         };
 
-        int ca = colFixedForItem(s.aRow, s.a);
-        int cb = colFixedForItem(s.bRow, s.b);
+        int ca = colFixedForItem(s.aRow, s.sem.a);
+        int cb = colFixedForItem(s.bRow, s.sem.b);
         int cc = -1;
-        if (s.flags & SemClue::HasC) cc = colFixedForItem(s.cRow, s.c);
+        if (s.sem.flags & ClueSemantic::HasC) cc = colFixedForItem(s.cRow, s.sem.c);
 
         // If all referenced items already have fixed columns, the clue is redundant.
         if (ca >= 0 && cb >= 0) {
-            if ((s.flags & SemClue::HasC) && cc >= 0) return true;
-            if (!(s.flags & SemClue::HasC)) return true;
+            if ((s.sem.flags & ClueSemantic::HasC) && cc >= 0) return true;
+            if (!(s.sem.flags & ClueSemantic::HasC)) return true;
         }
         return false;
     };
