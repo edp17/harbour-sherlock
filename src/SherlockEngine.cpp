@@ -2028,33 +2028,6 @@ void SherlockEngine::rebuildDosClues()
         }
     };
 
-    auto clueIsRedundantWithGivens = [&](const SemClue &s) -> bool {
-        // If the clue involves items whose exact columns are already fixed (givens),
-        // then the clue doesn’t add information and should be skipped for Medium/Hard.
-        // Note: we can infer "item's column" from the fixed cells for that row.
-
-        auto colFixedForItem = [&](int row, int item) -> int {
-            // scan row for a fixed cell that equals this item
-            for (int c = 0; c < n; ++c) {
-                int fi = fixedItemAt(row, c);
-                if (fi == item) return c;
-            }
-            return -1;
-        };
-
-        int ca = colFixedForItem(s.aRow, s.sem.a);
-        int cb = colFixedForItem(s.bRow, s.sem.b);
-        int cc = -1;
-        if (s.sem.flags & ClueSemantic::HasC) cc = colFixedForItem(s.cRow, s.sem.c);
-
-        // If all referenced items already have fixed columns, the clue is redundant.
-        if (ca >= 0 && cb >= 0) {
-            if ((s.sem.flags & ClueSemantic::HasC) && cc >= 0) return true;
-            if (!(s.sem.flags & ClueSemantic::HasC)) return true;
-        }
-        return false;
-    };
-
     // --- Difficulty knobs (tune later) ---
     auto vCluesPerStrip = [&]() -> int {
         if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
