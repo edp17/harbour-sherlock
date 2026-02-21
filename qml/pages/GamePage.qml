@@ -540,11 +540,11 @@ Loader {
     id: vClueLoader
     anchors.centerIn: parent
 
-    // Guard: never instantiate a clue component for null/undefined modelData
     readonly property bool hasClue: (clue !== undefined && clue !== null)
+    readonly property var comp: hasClue ? clueModel.componentForType(Number(clue.type)) : null
 
-    active: hasClue
-    sourceComponent: active ? clueModel.componentForType(Number(clue.type)) : null
+    active: (comp !== null)
+    sourceComponent: comp
 
     // keep iconPx available even before item exists (some components bind to it)
     property int iconPx: clueModel.iconPx
@@ -601,9 +601,10 @@ Loader {
     anchors.centerIn: parent
 
     readonly property bool hasClue: (clue !== undefined && clue !== null)
+    readonly property var comp: hasClue ? clueModel.componentForType(Number(clue.type)) : null
 
-    active: hasClue
-    sourceComponent: active ? clueModel.componentForType(Number(clue.type)) : null
+    active: (comp !== null)
+    sourceComponent: comp
 
     property int iconPx: clueModel.iconPx
 
