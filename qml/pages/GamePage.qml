@@ -583,22 +583,6 @@ Flickable {
                 readonly property var clue: (index < clueModel.vFlat.length) ? clueModel.vFlat[index] : null
                 readonly property var comp: (clue !== null) ? clueModel.componentForType(Number(clue.type)) : null
 
-//                Loader {
-//                    id: vCellLoader
-//                    anchors.centerIn: parent
-//                    active: (comp !== null)
-//                    sourceComponent: comp
-//
-//                    onLoaded: {
-//                        if (!item) return
-//                        item.clueObj = clue
-//
-//                        // Scale-to-fit so wide components (XOR) never overlap tiles
-//                        var sx = parent.width  / Math.max(1, item.width)
-//                        var sy = parent.height / Math.max(1, item.height)
-//                        item.scale = Math.min(1.0, sx, sy)
-//                    }
-//                }
 Loader {
     id: vCellLoader
     anchors.top: parent.top
@@ -851,6 +835,33 @@ Component {
     }
 }
 
+Component {
+    id: clueUpDownArrowTile
+
+    Item {
+        id: root
+        // Small marker, proportional to clue icon size
+        width: Math.max(10, Math.floor(cluePanel.clueIconPx * 0.55))
+        height: Math.max(10, Math.floor(cluePanel.clueIconPx * 0.55))
+
+//        Rectangle {
+//            anchors.fill: parent
+//            color: "#d6c84b" // same yellow-ish as dots tile (tweak later if needed)
+//            border.width: Math.max(2, Math.floor(parent.width * 0.10))
+//            border.color: "#6a6a6a"
+//            radius: Math.floor(parent.width * 0.18)
+//        }
+
+        Text {
+            anchors.centerIn: parent
+            text: "↕"
+            font.pixelSize: Math.max(10, Math.floor(parent.height * 0.75))
+            font.bold: true
+            color: "yellow" //"#2d61ff" // DOS-ish blue
+        }
+    }
+}
+
 //----------------------------------------------------------
 //-------------- RULES/CLUES -------------------------------
 //----------------------------------------------------------
@@ -993,6 +1004,7 @@ Component {
     }
 }
 
+
 Component {
     id: sameColXorComp
 
@@ -1001,8 +1013,7 @@ Component {
         property var clueObj: null
         property int iconPx: cluePanel.clueIconPx
 
-        // IMPORTANT: do NOT hard-code height/width for XOR.
-        // Let content define it so nothing gets clipped.
+        // Let content define size (prevents internal clipping)
         implicitWidth: col.implicitWidth
         implicitHeight: col.implicitHeight
 
@@ -1021,20 +1032,22 @@ Component {
             id: col
             anchors.left: parent.left
             anchors.top: parent.top
-            spacing: Math.max(2, Math.floor(iconPx * 0.10))
+            spacing: Math.max(2, Math.floor(iconPx * 0.08))
             visible: !!root.clueObj
 
+            // A
             Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
 
-            Text {
+            // B
+            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+
+            // up/down arrow marker between B and C
+            Loader {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "OR"
-                font.pixelSize: Math.max(12, Math.floor(iconPx * 0.30))
-                font.bold: true
-                color: Theme.primaryColor
+                sourceComponent: clueUpDownArrowTile
             }
 
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            // C
             Loader { id: cLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
         }
     }
