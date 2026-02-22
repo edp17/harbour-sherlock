@@ -100,7 +100,11 @@ SherlockEngine::SherlockEngine(QObject *parent)
         emit imagesChanged();
         saveState();
     }
-    rebuildClues();
+//    rebuildClues();
+    QTimer::singleShot(0, this, [this]() {
+        rebuildClues();
+        emit dosClueGroupsChanged();
+    });
     loadScoresFromDisk();
     loadSolvedBankFromDisk(m_size);
 }
@@ -1738,6 +1742,11 @@ void SherlockEngine::rebuildClues()
 
 void SherlockEngine::rebuildDosClues()
 {
+    qDebug() << "[rebuildDosClues] start n=" << m_size << " diff=" << m_difficulty;
+    QElapsedTimer t;
+    t.start();
+    const qint64 TIME_BUDGET_MS = 50; // keep UI responsive
+
     m_dosClueGroups.clear();
 
     const int n = m_size;
@@ -1781,98 +1790,97 @@ void SherlockEngine::rebuildDosClues()
         return m_solution[row * n + col]; // 0..n-1
     };
 
-   //---- HELPERS ------
+    // --- DOS clue helpers (place inside rebuildDosClues(), after colOf/itemAt) ---
 
-// --- DOS clue helpers (place inside rebuildDosClues(), after colOf/itemAt) ---
+    auto semHasC = [&](const SemClue& s) -> bool {
+        return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
+    };
 
-auto semHasC = [&](const SemClue& s) -> bool {
-    return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
-};
+    auto rowsDistinctRequired = [&](const SemClue& s) -> bool {
+        // For ALL of our DOS clue types, A and B must come from different rows.
+        if (s.aRow < 0 || s.bRow < 0) return false;
+        if (s.aRow == s.bRow) return false;
 
-auto rowsDistinctRequired = [&](const SemClue& s) -> bool {
-    // For ALL of our DOS clue types, A and B must come from different rows.
-    if (s.aRow < 0 || s.bRow < 0) return false;
-    if (s.aRow == s.bRow) return false;
-
-    if (semHasC(s)) {
-        if (s.cRow < 0) return false;
-        // For 3-icon variants in our supported DOS set, C is always a third row too.
-        // (This also prevents illegal "two items from same category" displays.)
-        if (s.cRow == s.aRow) return false;
-        if (s.cRow == s.bRow) return false;
-    }
-    return true;
-};
-
-auto recalcColsFromSolution = [&](SemClue& s) {
-    s.aCol = colOf(s.aRow, s.sem.a);
-    s.bCol = colOf(s.bRow, s.sem.b);
-    if (semHasC(s)) s.cCol = colOf(s.cRow, s.sem.c);
-    else s.cCol = -1;
-};
-
-auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
-    const int ca = colOf(s.aRow, s.sem.a);
-    const int cb = colOf(s.bRow, s.sem.b);
-    if (ca < 0 || cb < 0) return false;
-
-    const bool hasC = semHasC(s);
-    const int cc = hasC ? colOf(s.cRow, s.sem.c) : -1;
-    if (hasC && cc < 0) return false;
-
-    switch (s.sem.type) {
-    case ClueType::SameColumn:
-        if (ca != cb) return false;
-        if (hasC && ca != cc) return false;
+        if (semHasC(s)) {
+            if (s.cRow < 0) return false;
+            // For 3-icon variants in our supported DOS set, C is always a third row too.
+            // (This also prevents illegal "two items from same category" displays.)
+            if (s.cRow == s.aRow) return false;
+            if (s.cRow == s.bRow) return false;
+        }
         return true;
+    };
 
-    case ClueType::NotSameColumn:
-        if (!hasC) {
-            return (ca != cb);
-        } else {
-            // Rule 2 (3 icons): A and B are in same column, boxed item (C) is NOT in that column.
+    auto recalcColsFromSolution = [&](SemClue& s) {
+        s.aCol = colOf(s.aRow, s.sem.a);
+        s.bCol = colOf(s.bRow, s.sem.b);
+        if (semHasC(s)) s.cCol = colOf(s.cRow, s.sem.c);
+        else s.cCol = -1;
+    };
+
+    auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
+        const int ca = colOf(s.aRow, s.sem.a);
+        const int cb = colOf(s.bRow, s.sem.b);
+        if (ca < 0 || cb < 0) return false;
+
+        const bool hasC = semHasC(s);
+        const int cc = hasC ? colOf(s.cRow, s.sem.c) : -1;
+        if (hasC && cc < 0) return false;
+
+        switch (s.sem.type) {
+        case ClueType::SameColumn:
             if (ca != cb) return false;
-            return (cc != ca);
-        }
-
-    case ClueType::SameColumnXor:
-        // Rule 3: A is in same column as either B or C but NOT BOTH.
-        if (!hasC) return false; // XOR is always 3-icon
-        return ((ca == cb) ^ (ca == cc));
-
-    case ClueType::LeftOf:
-        // Rule 4: A is left of B
-        return (ca < cb);
-
-    case ClueType::NextTo:
-        // Rule 5:
-        // 2 icons: A next to B
-        // 3 icons: C next to B AND two columns away from A
-        if (!hasC) {
-            return (qAbs(ca - cb) == 1);
-        } else {
-            if (qAbs(ca - cb) != 1) return false;
-            if (qAbs(cc - cb) != 1) return false;
-            if (qAbs(cc - ca) != 2) return false;
+            if (hasC && ca != cc) return false;
             return true;
+
+        case ClueType::NotSameColumn:
+            if (!hasC) {
+                return (ca != cb);
+            } else {
+                // Rule 2 (3 icons): A and B are in same column, boxed item (C) is NOT in that column.
+            if (ca != cb) return false;
+                return (cc != ca);
+            }
+
+        case ClueType::SameColumnXor:
+            // Rule 3: A is in same column as either B or C but NOT BOTH.
+            if (!hasC) return false; // XOR is always 3-icon
+            return ((ca == cb) ^ (ca == cc));
+
+        case ClueType::LeftOf:
+            // Rule 4: A is left of B
+            return (ca < cb);
+
+        case ClueType::NextTo:
+            // Rule 5:
+            // 2 icons: A next to B
+            // 3 icons: C next to B AND two columns away from A
+            if (!hasC) {
+                return (qAbs(ca - cb) == 1);
+            } else {
+                if (qAbs(ca - cb) != 1) return false;
+                if (qAbs(cc - cb) != 1) return false;
+                if (qAbs(cc - ca) != 2) return false;
+                return true;
+            }
+
+        case ClueType::NotNextTo:
+            // Rule 6:
+            // 2 icons: A NOT next to B
+            // 3 icons: A and C have exactly one column between them, B is NOT in that between-column
+            if (!hasC) {
+                return (qAbs(ca - cb) != 1);
+            } else {
+                if (qAbs(ca - cc) != 2) return false;
+                const int between = (ca + cc) / 2; // safe because diff is 2
+                return (cb != between);
+            }
+
+        default:
+            return false;
         }
 
-    case ClueType::NotNextTo:
-        // Rule 6:
-        // 2 icons: A NOT next to B
-        // 3 icons: A and C have exactly one column between them, B is NOT in that between-column
-        if (!hasC) {
-            return (qAbs(ca - cb) != 1);
-        } else {
-            if (qAbs(ca - cc) != 2) return false;
-            const int between = (ca + cc) / 2; // safe because diff is 2
-            return (cb != between);
-        }
-
-    default:
-        return false;
-    }
-};
+    };
 
     QSet<QString> emitted; // across all groups for this rebuild
 
@@ -2285,6 +2293,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2360,6 +2371,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                     if (emitted.contains(sig)) continue;
                     emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                     g->clues.push_back(sc);
                     ++made;
                     continue;
@@ -2403,6 +2417,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2458,6 +2475,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2524,6 +2544,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2571,6 +2594,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2625,6 +2651,9 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
+if (t.elapsed() > TIME_BUDGET_MS) {
+    break; // stop generating more clues this pass
+}
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2633,6 +2662,7 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
     }
 
     emit dosClueGroupsChanged();
+    qDebug() << "[rebuildDosClues] done groups=" << m_dosClueGroups.size();
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const
