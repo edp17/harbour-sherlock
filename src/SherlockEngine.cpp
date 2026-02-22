@@ -1985,57 +1985,6 @@ auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
         return -1;
     };
 
-    // "Holds in solution" validator using *solution* columns (prevents contradictions).
-    auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
-        const int ca = colOf(s.aRow, s.sem.a);
-        const int cb = colOf(s.bRow, s.sem.b);
-        const int cc = hasC(s) ? colOf(s.cRow, s.sem.c) : -1;
-        if (ca < 0 || cb < 0) return false;
-        if (hasC(s) && cc < 0) return false;
-
-        switch (s.sem.type) {
-        case ClueType::SameColumn:
-            if (!hasC(s)) return (ca == cb);
-            return (ca == cb && ca == cc);
-
-        case ClueType::NotSameColumn:
-            if (!hasC(s)) return (ca != cb);
-            {
-                const int xi = xIndex(s);
-                // Two are same column; the X-boxed one is NOT in that column.
-                if (xi == 0) return (cb == cc) && (ca != cb);
-                if (xi == 1) return (ca == cc) && (cb != ca);
-                // default: C is the excluded one
-                return (ca == cb) && (cc != ca);
-            }
-
-        case ClueType::SameColumnXor:
-            // A shares column with exactly one of (B,C)
-            if (!hasC(s)) return false;
-            return ((ca == cb) ^ (ca == cc));
-
-        case ClueType::LeftOf:
-            return (ca < cb);
-
-        case ClueType::NextTo:
-            if (!hasC(s)) return (qAbs(ca - cb) == 1);
-            // 3-image variant: B is next to both A and C, and A/C are 2 apart (B between them)
-            return (qAbs(ca - cb) == 1) && (qAbs(cb - cc) == 1) && (qAbs(ca - cc) == 2);
-
-        case ClueType::NotNextTo:
-            if (!hasC(s)) return (qAbs(ca - cb) != 1);
-            // 3-image variant: A and C have exactly one column between them, and B is NOT in that middle column
-            if (qAbs(ca - cc) != 2) return false;
-            {
-                const int mid = (ca + cc) / 2; // safe because distance is 2 => same parity
-                return (cb != mid);
-            }
-
-        default:
-            return true; // other/legacy types: don't reject
-        }
-    };
-
     // Redundancy filter: if the clue is already fully implied by givens (fixed cells), skip it.
     auto clueIsRedundantWithGivens = [&](const SemClue& s) -> bool {
         const int ca = fixedColForItem(s.aRow, s.sem.a);
