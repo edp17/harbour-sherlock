@@ -1781,6 +1781,81 @@ void SherlockEngine::rebuildDosClues()
         return m_solution[row * n + col]; // 0..n-1
     };
 
+    QSet<QString> emitted; // across all groups for this rebuild
+
+    auto clueSignature = [&](const SemClue &s) -> QString {
+        // Use semantic items + rows (and xMark/flags) as identity. Keep it stable.
+        // For symmetric 2-icon types (SameColumn, NotSameColumn, NextTo, NotNextTo), sort A/B by (row,item).
+        auto keyPair = [&](int r, int item) -> QString { return QString::number(r) + ":" + QString::number(item); };
+
+        const bool hasC = (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
+
+        QString A = keyPair(s.aRow, s.sem.a);
+        QString B = keyPair(s.bRow, s.sem.b);
+        QString C = hasC ? keyPair(s.cRow, s.sem.c) : QString("-");
+
+        const bool symmetricAB =
+            (s.sem.type == ClueType::SameColumn) ||
+            (s.sem.type == ClueType::NotSameColumn) ||
+            (s.sem.type == ClueType::NextTo) ||
+            (s.sem.type == ClueType::NotNextTo);
+
+        if (symmetricAB && A > B) qSwap(A, B);
+
+        // XOR is *not* symmetric: A is special. LeftOf is directional too.
+        return QString("%1|o%2|i%3|t%4|f%5|x%6|%7|%8|%9")
+            .arg(int(s.sem.given))
+            .arg(int(s.orient))
+            .arg(int(s.index))
+            .arg(int(s.sem.type))
+            .arg(int(s.sem.flags))
+            .arg(int(s.sem.xMark))
+            .arg(A).arg(B).arg(C);
+    };
+
+    // Normalize sem AND keep aRow/aCol/bRow/bCol/cRow/cCol consistent with sem.a/sem.b/sem.c.
+    auto normalizeSemClue = [&](SemClue &sc) {
+        const ClueSemantic before = sc.sem;
+        const ClueSemantic after  = normalizeClue(sc.sem);
+
+        // If no change, nothing to do.
+        if (after.type == before.type &&
+            after.a == before.a && after.b == before.b && after.c == before.c &&
+            after.flags == before.flags && after.given == before.given &&
+            after.xMark == before.xMark) {
+            return;
+        }
+
+        // Build old triplet of items and their row/col
+        struct Slot { int item; int row; int col; };
+        Slot oldSlots[3] = {
+            { before.a, sc.aRow, sc.aCol },
+            { before.b, sc.bRow, sc.bCol },
+            { before.c, sc.cRow, sc.cCol }
+        };
+
+        auto findSlot = [&](int item) -> Slot {
+            for (const auto &s : oldSlots) {
+                if (s.item == item) return s;
+            }
+            // Should never happen, but keep safe
+            return Slot{ item, -1, -1 };
+        };
+
+        // Re-attach rows/cols to match the normalized a/b/c items
+        {
+            Slot sA = findSlot(after.a);
+            Slot sB = findSlot(after.b);
+            Slot sC = findSlot(after.c);
+
+            sc.aRow = sA.row; sc.aCol = sA.col;
+            sc.bRow = sB.row; sc.bCol = sB.col;
+            sc.cRow = sC.row; sc.cCol = sC.col;
+        }
+
+        sc.sem = after;
+    };
+
     // Helper: does this SemClue have a C item?
     auto hasC = [&](const SemClue& s) -> bool {
         return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
@@ -1957,6 +2032,21 @@ void SherlockEngine::rebuildDosClues()
 
     // Core: check semantics against solution
     auto clueHolds = [&](const SemClue &s) -> bool {
+        const bool hasC = (s.sem.flags & ClueSemantic::HasC);
+        const bool isVerticalFamily =
+                (s.sem.type == ClueType::SameColumn) ||
+                (s.sem.type == ClueType::NotSameColumn) ||
+                (s.sem.type == ClueType::SameColumnXor);
+
+        if (isVerticalFamily) {
+            if (s.aRow < 0 || s.bRow < 0) return false;
+            if (s.aRow == s.bRow) return false;
+            if (hasC) {
+                if (s.cRow < 0) return false;
+                if (s.cRow == s.aRow || s.cRow == s.bRow) return false;
+            }
+        }
+
         auto colA = [&]() -> int { return colOf(s.aRow, s.sem.a); };
         auto colB = [&]() -> int { return colOf(s.bRow, s.sem.b); };
         auto colC = [&]() -> int { return colOf(s.cRow, s.sem.c); };
@@ -2096,7 +2186,11 @@ void SherlockEngine::rebuildDosClues()
         int made = 0;
         quint32 st = rngSeed(0x22220000u + quint32(col));
 
-        while (made < vPer) {
+        int attempts = 0;
+        const int maxAttempts = 2000; // bump as needed; cheap, this is small n
+
+        while (made < vPer && attempts < maxAttempts) {
+            ++attempts;
             const int pick = int(nextRand(st) % 3u); // 0..2 choose type family
 
             if (pick == 0) {
@@ -2124,7 +2218,7 @@ void SherlockEngine::rebuildDosClues()
                     sc.sem.flags = 0;
                 }
 
-                sc.sem = normalizeClue(sc.sem);
+                normalizeSemClue(sc);
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2135,6 +2229,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
@@ -2157,16 +2255,53 @@ void SherlockEngine::rebuildDosClues()
                 sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
 
                 if (!want3) {
-                    // pick b from a DIFFERENT column (not same column as a)
-                    // simplest: same row as a, take different column's item
-                    const int r = sc.aRow;
-                    int otherCol = int(nextRand(st) % quint32(n));
-                    if (otherCol == col) otherCol = (otherCol + 1) % n;
+                    // 2 icons: A and B are NOT in the same column.
+                    // IMPORTANT: For DOS-style vertical clues, A and B must be from DIFFERENT rows/categories.
+                    // Pick A from (aRow, col) and B from (bRow != aRow, bCol != col).
 
-                    sc.bRow = r; sc.bCol = otherCol; sc.sem.b = itemAt(r, otherCol);
+                    const int aRow = inThisCol[0].first;
+                    const int bRow = inThisCol[1].first; // different row
 
-                    sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
+                    int bCol = int(nextRand(st) % quint32(n));
+                    if (bCol == col) bCol = (bCol + 1) % n; // ensure different column than A's column
+
+                    SemClue sc;
+                    sc.orient = int(Vertical);
+                    sc.index = col;
+                    sc.sem.type = ClueType::NotSameColumn;
+                    sc.sem.given = true;
+
+                    // A in this column
+                    sc.aRow = aRow;
+                    sc.aCol = col;
+                    sc.sem.a = itemAt(aRow, col);
+
+                    // B in a different row AND different column
+                    sc.bRow = bRow;
+                    sc.bCol = bCol;
+                    sc.sem.b = itemAt(bRow, bCol);
+
+                    sc.cRow = -1;
+                    sc.cCol = -1;
+                    sc.sem.c = -1;
                     sc.sem.flags = 0;
+
+                    // (2) must be true in the solution (prevents contradictions)
+                    if (!clueHolds(sc)) {
+                        continue;
+                    }
+                    // (3) avoid trivial clues on Medium/Hard
+                    if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
+                        continue;
+                    }
+
+                    const QString sig = clueSignature(sc);
+                    if (emitted.contains(sig)) continue;
+                    emitted.insert(sig);
+
+                    g->clues.push_back(sc);
+                    ++made;
+                    continue;
                 } else {
                     // b is also in same column (col)
                     sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
@@ -2182,7 +2317,7 @@ void SherlockEngine::rebuildDosClues()
                     sc.sem.flags = 1 | 2;
                 }
 
-                sc.sem = normalizeClue(sc.sem);
+                normalizeSemClue(sc);
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2193,6 +2328,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
@@ -2224,7 +2363,7 @@ void SherlockEngine::rebuildDosClues()
                 // flags: HAS_C
                 sc.sem.flags = 1;
 
-                sc.sem = normalizeClue(sc.sem);
+                normalizeSemClue(sc);
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2235,6 +2374,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
@@ -2277,7 +2420,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
                 sc.sem.flags = 0;
 
-                sc.sem = normalizeClue(sc.sem);
+                normalizeSemClue(sc);
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2288,6 +2431,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
@@ -2311,7 +2458,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
                 sc.sem.flags = 0;
 
-                sc.sem = normalizeClue(sc.sem);
+                normalizeSemClue(sc);
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2322,6 +2469,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
@@ -2352,7 +2503,7 @@ void SherlockEngine::rebuildDosClues()
                 sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
                 sc.sem.flags = 0;
 
-                sc.sem = normalizeClue(sc.sem);
+                ;
 
                 // (2) must be true in the solution (prevents contradictions)
                 if (!clueHolds(sc)) {
@@ -2363,6 +2514,10 @@ void SherlockEngine::rebuildDosClues()
                 if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
                     continue;
                 }
+
+                const QString sig = clueSignature(sc);
+                if (emitted.contains(sig)) continue;
+                emitted.insert(sig);
 
                 g->clues.push_back(sc);
                 ++made;
