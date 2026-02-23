@@ -2279,23 +2279,13 @@ void SherlockEngine::rebuildDosClues()
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2371,9 +2361,9 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     if (emitted.contains(sig)) continue;
                     emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                    if (t.elapsed() > TIME_BUDGET_MS) {
+                        break; // stop generating more clues this pass
+                    }
                     g->clues.push_back(sc);
                     ++made;
                     continue;
@@ -2403,23 +2393,13 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2461,23 +2441,13 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2497,7 +2467,14 @@ if (t.elapsed() > TIME_BUDGET_MS) {
         quint32 st = rngSeed(0x33330000u + quint32(row));
 
         int made = 0;
-        while (made < hPer) {
+        int attempts = 0;
+        const int maxAttempts = 4000; // safe cap, prevents hang
+
+        while (made < hPer && attempts < maxAttempts) {
+            ++attempts;
+
+            // hard time budget guard (also prevents long stalls)
+            if (t.elapsed() > TIME_BUDGET_MS) break;
             const int pick = int(nextRand(st) % 3u); // 0..2
 
             if (pick == 0) {
@@ -2530,23 +2507,13 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2580,23 +2547,13 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
@@ -2637,23 +2594,13 @@ if (t.elapsed() > TIME_BUDGET_MS) {
                     continue;
                 }
 
-                // (2) must be true in the solution (prevents contradictions)
-//                if (!clueHolds(sc)) {
-//                    continue;
-//                }
-
-                // (3) avoid trivial clues on Medium/Hard
-//                if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                    continue;
-//                }
-
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
 
-if (t.elapsed() > TIME_BUDGET_MS) {
-    break; // stop generating more clues this pass
-}
+                if (t.elapsed() > TIME_BUDGET_MS) {
+                    break; // stop generating more clues this pass
+                }
                 g->clues.push_back(sc);
                 ++made;
                 continue;
