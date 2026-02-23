@@ -1957,6 +1957,42 @@ void SherlockEngine::rebuildDosClues()
         sc.sem = after;
     };
 
+    // Prevent contradictory SameColumn duplicates ---
+    // Tracks forced column for each (row,item) implied by emitted SameColumn clues.
+    QHash<int, int> forcedSameCol; // key=(row<<8)|item  value=col
+
+    auto scKey = [&](int row, int item) -> int {
+        return (row << 8) | (item & 0xFF);
+    };
+
+    auto acceptAndRecordSameColumn = [&](const SemClue& s) -> bool {
+        if (s.sem.type != ClueType::SameColumn) return true;
+
+        // SameColumn must have aRow/bRow and a/b; optional c
+        const int col = s.aCol; // after recalcColsFromSolution(), this is the solution column
+        if (col < 0) return false;
+
+        auto checkOne = [&](int row, int item) -> bool {
+            if (row < 0 || item < 0) return true;
+            const int k = scKey(row, item);
+            auto it = forcedSameCol.find(k);
+            if (it != forcedSameCol.end()) {
+                return (*it == col); // must match previously forced column
+            }
+            forcedSameCol.insert(k, col);
+            return true;
+        };
+
+        if (!checkOne(s.aRow, s.sem.a)) return false;
+        if (!checkOne(s.bRow, s.sem.b)) return false;
+
+        // If you use semHasC(s) already, reuse it:
+        if (semHasC(s)) {
+            if (!checkOne(s.cRow, s.sem.c)) return false;
+        }
+        return true;
+    };
+
     // Helper: does this SemClue have a C item?
     auto hasC = [&](const SemClue& s) -> bool {
         return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
@@ -2279,6 +2315,10 @@ void SherlockEngine::rebuildDosClues()
                     continue;
                 }
 
+                if (!acceptAndRecordSameColumn(sc)) {
+                    continue;
+                }
+
                 const QString sig = clueSignature(sc);
                 if (emitted.contains(sig)) continue;
                 emitted.insert(sig);
@@ -2338,14 +2378,6 @@ void SherlockEngine::rebuildDosClues()
                     sc.sem.c = -1;
                     sc.sem.flags = 0;
 
-                    // (2) must be true in the solution (prevents contradictions)
-//                    if (!clueHolds(sc)) {
-//                        continue;
-//                    }
-                    // (3) avoid trivial clues on Medium/Hard
-//                    if (m_difficulty != int(Easy) && clueIsRedundantWithGivens(sc)) {
-//                        continue;
-//                    }
                     // Normalize / sanity / validate / dedupe BEFORE emitting
                     normalizeSemClue(sc);
                     recalcColsFromSolution(sc);
@@ -2606,9 +2638,58 @@ void SherlockEngine::rebuildDosClues()
                 continue;
             }
         }
+        if (made == 0) {
+            // Force at least one simple LeftOf clue per row if possible
+            for (int col = 0; col < n-1; ++col) {
+                SemClue sc;
+                sc.orient = 1;
+                sc.index = row;
+                sc.sem.type = ClueType::LeftOf;
+                sc.sem.given = true;
+
+                sc.aRow = row;
+                sc.aCol = col;
+                sc.sem.a = itemAt(row, col);
+
+                sc.bRow = row;
+                sc.bCol = col + 1;
+                sc.sem.b = itemAt(row, col + 1);
+
+                normalizeSemClue(sc);
+                recalcColsFromSolution(sc);
+
+                if (clueHoldsInSolution(sc)) {
+                    g->clues.push_back(sc);
+                    break;
+                }
+            }
+        }
     }
 
     emit dosClueGroupsChanged();
+    // --- DEBUG: verify what we actually produced ---
+    int vGroups = 0, hGroups = 0, vClues = 0, hClues = 0;
+    for (const auto &g : m_dosClueGroups) {
+        if (g.orient == 0) { ++vGroups; vClues += g.clues.size(); }
+        else if (g.orient == 1) { ++hGroups; hClues += g.clues.size(); }
+        else { qDebug() << "[rebuildDosClues] WARNING: unknown orient" << g.orient; }
+    }
+    qDebug() << "[rebuildDosClues] summary:"
+             << "vGroups=" << vGroups << "vClues=" << vClues
+             << "hGroups=" << hGroups << "hClues=" << hClues;
+
+    // Optional: show first few horizontal clues if any
+    for (const auto &g : m_dosClueGroups) {
+        if (g.orient != 1) continue;
+        qDebug() << "[rebuildDosClues] horiz row" << g.index << "clues=" << g.clues.size();
+        for (int i = 0; i < g.clues.size() && i < 3; ++i) {
+            const auto &c = g.clues[i];
+            qDebug() << "  type=" << int(c.sem.type)
+                     << "aRow=" << c.aRow << "a=" << c.sem.a
+                     << "bRow=" << c.bRow << "b=" << c.sem.b
+                     << "flags=" << c.sem.flags;
+        }
+    }
     qDebug() << "[rebuildDosClues] done groups=" << m_dosClueGroups.size();
 }
 
