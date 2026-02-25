@@ -2387,7 +2387,6 @@ void SherlockEngine::rebuildDosClues()
                 if (!clueHoldsInSolution(sc)) {
                     continue;
                 }
-
                 if (!acceptAndRecordSameColumn(sc)) {
                     continue;
                 }
@@ -2430,7 +2429,7 @@ void SherlockEngine::rebuildDosClues()
                     int bCol = int(nextRand(st) % quint32(n));
                     if (bCol == col) bCol = (bCol + 1) % n; // ensure different column than A's column
 
-                    SemClue sc;
+                    SemClue sc2;
                     sc.orient = int(Vertical);
                     sc.index = col;
                     sc.sem.type = ClueType::NotSameColumn;
@@ -2464,7 +2463,6 @@ void SherlockEngine::rebuildDosClues()
                     if (!clueHoldsInSolution(sc)) {
                         continue;
                     }
-
                     if (!acceptAndRecordSameColumn(sc)) {
                         continue;
                     }
@@ -2491,7 +2489,7 @@ void SherlockEngine::rebuildDosClues()
                     sc.cRow = r; sc.cCol = otherCol; sc.sem.c = itemAt(r, otherCol);
 
                     // flags: HAS_C + C_IS_XBOX
-                    sc.sem.flags = 1 | 2;
+                    sc.sem.flags = ClueSemantic::HasC | XBOX_C;
                 }
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
@@ -2506,6 +2504,9 @@ void SherlockEngine::rebuildDosClues()
                     continue;
                 }
                 if (!clueHoldsInSolution(sc)) {
+                    continue;
+                }
+                if (!acceptAndRecordSameColumn(sc)) {
                     continue;
                 }
 
@@ -2558,6 +2559,9 @@ void SherlockEngine::rebuildDosClues()
                     continue;
                 }
                 if (!clueHoldsInSolution(sc)) {
+                    continue;
+                }
+                if (!acceptAndRecordSameColumn(sc)) {
                     continue;
                 }
 
