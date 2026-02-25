@@ -1959,51 +1959,113 @@ void SherlockEngine::rebuildDosClues()
 
     // Prevent contradictory SameColumn duplicates ---
     // Tracks forced column for each (row,item) implied by emitted SameColumn clues.
-    QHash<int, int> forcedSameCol; // key=(row<<8)|item  value=col
+    QHash<int, int> forcedSameCol; // key=(row<<8)|item, value=solution column
 
     auto scKey = [&](int row, int item) -> int {
         return (row << 8) | (item & 0xFF);
     };
 
+    QHash<int,int> forcedRowCol; // key(row,col) -> item
+    auto rcKey = [&](int row, int col) -> int {
+        // n is 6, but keep it generic
+        return row * n + col;
+    };
+
+    // Local-only flags to encode which slot is X-boxed for NotSameColumn(3)
+    constexpr int XBOX_A = 1 << 20;
+    constexpr int XBOX_B = 1 << 21;
+    constexpr int XBOX_C = 1 << 22;
+
+    auto xIndex = [&](const SemClue& s) -> int {
+        if (s.sem.flags & XBOX_A) return 0;
+        if (s.sem.flags & XBOX_B) return 1;
+        if (s.sem.flags & XBOX_C) return 2;
+        return -1;
+    };
+
     auto acceptAndRecordSameColumn = [&](const SemClue& s) -> bool {
-        if (s.sem.type != ClueType::SameColumn) return true;
+        // We record "forced column" constraints for:
+        //  (A) SameColumn clues (Rule 1)
+        //  (B) The *pair* that is same-column inside NotSameColumn with 3 icons (Rule 2 variant)
 
-        // SameColumn must have aRow/bRow and a/b; optional c
-        const int col = s.aCol; // after recalcColsFromSolution(), this is the solution column
-        if (col < 0) return false;
-
-        auto checkOne = [&](int row, int item) -> bool {
-            if (row < 0 || item < 0) return true;
-            const int k = scKey(row, item);
-            auto it = forcedSameCol.find(k);
-            if (it != forcedSameCol.end()) {
-                return (*it == col); // must match previously forced column
+        auto checkOne = [&](int row, int item, int col) -> bool {
+            // Forward constraint: this item can't be forced to two different columns
+            {
+                const int k = scKey(row, item);
+                auto it = forcedSameCol.find(k);
+                if (it != forcedSameCol.end() && it.value() != col)
+                    return false;
             }
-            forcedSameCol.insert(k, col);
+
+            // Inverse constraint: this row+column can't be occupied by two different items
+            {
+                const int rk = rcKey(row, col);
+                auto it2 = forcedRowCol.find(rk);
+                if (it2 != forcedRowCol.end() && it2.value() != item)
+                    return false;
+            }
+
             return true;
         };
 
-        if (!checkOne(s.aRow, s.sem.a)) return false;
-        if (!checkOne(s.bRow, s.sem.b)) return false;
+        // --- (A) Rule 1: SameColumn ---
+        if (s.sem.type == ClueType::SameColumn) {
+            // After recalcColsFromSolution(), aCol/bCol/cCol are solution columns
+            const int col = s.aCol;
+            if (col < 0) return false;
 
-        // If you use semHasC(s) already, reuse it:
-        if (semHasC(s)) {
-            if (!checkOne(s.cRow, s.sem.c)) return false;
+            if (!checkOne(s.aRow, s.sem.a, col)) return false;
+            if (!checkOne(s.bRow, s.sem.b, col)) return false;
+
+            const bool hasC = (s.cRow >= 0 && s.sem.c >= 0);
+            if (hasC) {
+                if (!checkOne(s.cRow, s.sem.c, col)) return false;
+            }
+            return true;
         }
+
+        // --- (B) Rule 2 (3 icons): NotSameColumn where TWO are same-column and the X-box one is NOT ---
+        // Only applies when the clue actually has C and we can identify which icon is boxed.
+        if (s.sem.type == ClueType::NotSameColumn && semHasC(s)) {
+            const int xi = xIndex(s);     // 0=a, 1=b, 2=c ; -1 if unknown
+            if (xi < 0) return true;      // if we can't identify the boxed one, don't block generation
+
+            // Determine the "same-column pair" (the two *not* boxed)
+            // If A is boxed -> B and C are same-column
+            // If B is boxed -> A and C are same-column
+            // If C is boxed -> A and B are same-column
+            int row1=-1, item1=-1, col1=-1;
+            int row2=-1, item2=-1, col2=-1;
+
+            if (xi == 0) { // A boxed => B & C same column
+                row1 = s.bRow; item1 = s.sem.b; col1 = s.bCol;
+                row2 = s.cRow; item2 = s.sem.c; col2 = s.cCol;
+            } else if (xi == 1) { // B boxed => A & C same column
+                row1 = s.aRow; item1 = s.sem.a; col1 = s.aCol;
+                row2 = s.cRow; item2 = s.sem.c; col2 = s.cCol;
+            } else { // xi == 2 ; C boxed => A & B same column
+                row1 = s.aRow; item1 = s.sem.a; col1 = s.aCol;
+                row2 = s.bRow; item2 = s.sem.b; col2 = s.bCol;
+            }
+
+            // Sanity: in a valid clue that holds in solution these two cols must match anyway,
+            // but we rely on recalcColsFromSolution() already having run.
+            if (col1 < 0 || col2 < 0) return false;
+            if (col1 != col2) return false;
+
+            if (!checkOne(row1, item1, col1)) return false;
+            if (!checkOne(row2, item2, col2)) return false;
+
+            return true;
+        }
+
+        // Other clue types: no forced-col tracking here
         return true;
     };
 
     // Helper: does this SemClue have a C item?
     auto hasC = [&](const SemClue& s) -> bool {
         return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
-    };
-
-    // Helper: which of a/b/c is marked with the red-X box in the semantic clue
-    // Prefer sem.xMark when present; fallback: if CIsXbox flag is set, treat C as the boxed one.
-    auto xIndex = [&](const SemClue& s) -> int {
-        if (s.sem.xMark >= 0) return s.sem.xMark;                 // 0=a,1=b,2=c
-        if (s.sem.flags & ClueSemantic::CIsXbox) return 2;        // C boxed
-        return -1;
     };
 
     // Extract fixed column for (row,item) from current givens (fixed cells).
@@ -2376,7 +2438,8 @@ void SherlockEngine::rebuildDosClues()
                     sc.cRow = -1;
                     sc.cCol = -1;
                     sc.sem.c = -1;
-                    sc.sem.flags = 0;
+//                    sc.sem.flags = 0;
+                    sc.sem.flags |= XBOX_C;
 
                     // Normalize / sanity / validate / dedupe BEFORE emitting
                     normalizeSemClue(sc);
@@ -2386,6 +2449,10 @@ void SherlockEngine::rebuildDosClues()
                         continue;
                     }
                     if (!clueHoldsInSolution(sc)) {
+                        continue;
+                    }
+
+                    if (!acceptAndRecordSameColumn(sc)) {
                         continue;
                     }
 
