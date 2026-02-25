@@ -1742,7 +1742,7 @@ void SherlockEngine::rebuildClues()
 
 void SherlockEngine::rebuildDosClues()
 {
-    qDebug() << "[rebuildDosClues] start n=" << m_size << " diff=" << m_difficulty;
+//    qDebug() << "[rebuildDosClues] start n=" << m_size << " diff=" << m_difficulty;
     QElapsedTimer t;
     t.start();
     const qint64 TIME_BUDGET_MS = 50; // keep UI responsive
@@ -1914,47 +1914,54 @@ void SherlockEngine::rebuildDosClues()
             .arg(A).arg(B).arg(C);
     };
 
-    // Normalize sem AND keep aRow/aCol/bRow/bCol/cRow/cCol consistent with sem.a/sem.b/sem.c.
-    auto normalizeSemClue = [&](SemClue &sc) {
-        const ClueSemantic before = sc.sem;
-        const ClueSemantic after  = normalizeClue(sc.sem);
-
-        // If no change, nothing to do.
-        if (after.type == before.type &&
-            after.a == before.a && after.b == before.b && after.c == before.c &&
-            after.flags == before.flags && after.given == before.given &&
-            after.xMark == before.xMark) {
-            return;
+    auto normPair = [&](int &r1, int &i1, int &c1,
+                        int &r2, int &i2, int &c2)
+    {
+        if (r1 > r2 || (r1 == r2 && i1 > i2)) {
+            qSwap(r1, r2);
+            qSwap(i1, i2);
+            qSwap(c1, c2);
         }
+    };
 
-        // Build old triplet of items and their row/col
-        struct Slot { int item; int row; int col; };
-        Slot oldSlots[3] = {
-            { before.a, sc.aRow, sc.aCol },
-            { before.b, sc.bRow, sc.bCol },
-            { before.c, sc.cRow, sc.cCol }
-        };
+    // DOS-only normalization that NEVER loses row association.
+    // We only swap whole (row,item,col) tuples.
+    auto normalizeDosSemClue = [&](SemClue &sc)
+    {
+        const bool hasC = semHasC(sc);
 
-        auto findSlot = [&](int item) -> Slot {
-            for (const auto &s : oldSlots) {
-                if (s.item == item) return s;
+        switch (sc.sem.type) {
+        case ClueType::SameColumn:
+        case ClueType::NotSameColumn:
+        case ClueType::NextTo:
+        case ClueType::NotNextTo:
+            if (!hasC) {
+                // symmetric A/B: order by (row,item)
+                normPair(sc.aRow, sc.sem.a, sc.aCol,
+                         sc.bRow, sc.sem.b, sc.bCol);
+            } else if (sc.sem.type == ClueType::NotSameColumn) {
+                // Rule 2 (3 icons): C is the boxed item -> keep C fixed, normalize only A/B
+                normPair(sc.aRow, sc.sem.a, sc.aCol,
+                         sc.bRow, sc.sem.b, sc.bCol);
             }
-            // Should never happen, but keep safe
-            return Slot{ item, -1, -1 };
-        };
+            // For NextTo/NotNextTo 3-icon variants: keep A,B,C as generated (B is "middle").
+            break;
 
-        // Re-attach rows/cols to match the normalized a/b/c items
-        {
-            Slot sA = findSlot(after.a);
-            Slot sB = findSlot(after.b);
-            Slot sC = findSlot(after.c);
-
-            sc.aRow = sA.row; sc.aCol = sA.col;
-            sc.bRow = sB.row; sc.bCol = sB.col;
-            sc.cRow = sC.row; sc.cCol = sC.col;
+        case ClueType::SameColumnXor:
+            // XOR: A is special, but (B,C) can be ordered stably
+            if (hasC) {
+                normPair(sc.bRow, sc.sem.b, sc.bCol,
+                     sc.cRow, sc.sem.c, sc.cCol);
         }
+        break;
 
-        sc.sem = after;
+        case ClueType::LeftOf:
+            // directional -> keep order
+            break;
+
+        default:
+            break;
+        }
     };
 
     // Prevent contradictory SameColumn duplicates ---
@@ -2367,9 +2374,13 @@ void SherlockEngine::rebuildDosClues()
                 }
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2438,13 +2449,15 @@ void SherlockEngine::rebuildDosClues()
                     sc.cRow = -1;
                     sc.cCol = -1;
                     sc.sem.c = -1;
-//                    sc.sem.flags = 0;
                     sc.sem.flags |= XBOX_C;
 
-                    // Normalize / sanity / validate / dedupe BEFORE emitting
-                    normalizeSemClue(sc);
+                    // 1) normalize by swapping full tuples only (row-safe)
+                    normalizeDosSemClue(sc); 
+
+                    // 2) recompute columns from solution AFTER normalization
                     recalcColsFromSolution(sc);
 
+                    // 3) validate against solution
                     if (!rowsDistinctRequired(sc)) {
                         continue;
                     }
@@ -2482,9 +2495,13 @@ void SherlockEngine::rebuildDosClues()
                 }
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2530,9 +2547,13 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 1;
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2596,9 +2617,13 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2636,9 +2661,13 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2683,9 +2712,13 @@ void SherlockEngine::rebuildDosClues()
                 sc.sem.flags = 0;
 
                 // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
 
+                // 3) validate against solution
                 if (!rowsDistinctRequired(sc)) {
                     continue;
                 }
@@ -2722,8 +2755,16 @@ void SherlockEngine::rebuildDosClues()
                 sc.bCol = col + 1;
                 sc.sem.b = itemAt(row, col + 1);
 
-                normalizeSemClue(sc);
+                // 1) normalize by swapping full tuples only (row-safe)
+                normalizeDosSemClue(sc); 
+
+                // 2) recompute columns from solution AFTER normalization
                 recalcColsFromSolution(sc);
+
+                // 3) validate against solution
+                if (!clueHoldsInSolution(sc)) {
+                    continue;
+                }
 
                 if (clueHoldsInSolution(sc)) {
                     g->clues.push_back(sc);
@@ -2739,25 +2780,25 @@ void SherlockEngine::rebuildDosClues()
     for (const auto &g : m_dosClueGroups) {
         if (g.orient == 0) { ++vGroups; vClues += g.clues.size(); }
         else if (g.orient == 1) { ++hGroups; hClues += g.clues.size(); }
-        else { qDebug() << "[rebuildDosClues] WARNING: unknown orient" << g.orient; }
+        else { }//qDebug() << "[rebuildDosClues] WARNING: unknown orient" << g.orient; }
     }
-    qDebug() << "[rebuildDosClues] summary:"
-             << "vGroups=" << vGroups << "vClues=" << vClues
-             << "hGroups=" << hGroups << "hClues=" << hClues;
+//    qDebug() << "[rebuildDosClues] summary:"
+//             << "vGroups=" << vGroups << "vClues=" << vClues
+//             << "hGroups=" << hGroups << "hClues=" << hClues;
 
     // Optional: show first few horizontal clues if any
     for (const auto &g : m_dosClueGroups) {
         if (g.orient != 1) continue;
-        qDebug() << "[rebuildDosClues] horiz row" << g.index << "clues=" << g.clues.size();
+//        qDebug() << "[rebuildDosClues] horiz row" << g.index << "clues=" << g.clues.size();
         for (int i = 0; i < g.clues.size() && i < 3; ++i) {
             const auto &c = g.clues[i];
-            qDebug() << "  type=" << int(c.sem.type)
-                     << "aRow=" << c.aRow << "a=" << c.sem.a
-                     << "bRow=" << c.bRow << "b=" << c.sem.b
-                     << "flags=" << c.sem.flags;
+//            qDebug() << "  type=" << int(c.sem.type)
+//                     << "aRow=" << c.aRow << "a=" << c.sem.a
+//                     << "bRow=" << c.bRow << "b=" << c.sem.b
+//                     << "flags=" << c.sem.flags;
         }
     }
-    qDebug() << "[rebuildDosClues] done groups=" << m_dosClueGroups.size();
+//    qDebug() << "[rebuildDosClues] done groups=" << m_dosClueGroups.size();
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const
