@@ -1,0 +1,50 @@
+Budapest / Hungary theme
+Letters: DANUBE
+
+Characters
+  A1: Hungarian king
+  A2: folk woman
+  A3: 19th-century gentleman
+  A4: Budapest lady
+  A5: elder statesman
+  A6: hussar
+
+Objects
+  B1: Hungarian crest/crown
+  B2: folk pottery
+  B3: Parliament
+  B4: Chain Bridge
+  B5: Budapest landmark
+  B6: paprika
+
+Numbers
+  C1: I
+  C2: II
+  C3: III
+  C4: IV
+  C5: V
+  C6: VI
+
+Food / drinks
+  D1: red wine
+  D2: coffee
+  D3: goulash-style dish
+  D4: mineral water
+  D5: fruit spirit
+  D6: Dobos-style cake
+
+Transport / scenes
+  E1: yellow tram
+  E2: Danube riverboat
+  E3: steam locomotive
+  E4: horse carriage
+  E5: Hungarian balloon
+  E6: historic aircraft
+
+Letters
+  F1: D
+  F2: A
+  F3: N
+  F4: U
+  F5: B
+  F6: E

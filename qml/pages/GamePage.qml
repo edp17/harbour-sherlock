@@ -1,6 +1,23 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
-import Sailfish.Pickers 1.0
 
 import "../components" as Components
 import "../"
@@ -29,8 +46,7 @@ Page
     Connections {
         target: appSettings
         onBoardSizeChanged: {
-            sherlockEngine.setSize(appSettings.boardSize)
-            sherlockEngine.startBankPuzzle(0)
+            sherlockEngine.setBoardSize(appSettings.boardSize)
         }
         onPlayerNameChanged: {
             sherlockEngine.setPlayerName(appSettings.playerName)
@@ -86,7 +102,7 @@ Connections {
         clueModel.rebuildFlat()
         clueModel.rebuildHFlat()
         sherlockEngine.setPlayerName(appSettings.playerName)
-        sherlockEngine.setSize(appSettings.boardSize)
+        sherlockEngine.setBoardSize(appSettings.boardSize)
         sherlockEngine.setDifficulty(appSettings.difficulty)
         solvedStartupTimer.start()
     }
@@ -99,6 +115,22 @@ Connections {
         }
     }
 
+    Component {
+        id: dimmedClueEffect
+
+        ShaderEffect {
+            property variant source
+            fragmentShader: "varying highp vec2 qt_TexCoord0;\n" +
+                            "uniform sampler2D source;\n" +
+                            "uniform lowp float qt_Opacity;\n" +
+                            "void main(void) {\n" +
+                            "    lowp vec4 pixel = texture2D(source, qt_TexCoord0);\n" +
+                            "    lowp float grey = dot(pixel.rgb, vec3(0.299, 0.587, 0.114));\n" +
+                            "    gl_FragColor = vec4(vec3(grey), pixel.a) * qt_Opacity;\n" +
+                            "}\n"
+        }
+    }
+
     SilicaFlickable
     {
         anchors.fill: parent
@@ -107,62 +139,20 @@ Connections {
         PullDownMenu
         {
             MenuItem {
-                text: "Random puzzle"
+                text: qsTr("Random puzzle")
                 onClicked: sherlockEngine.startRandomPuzzle()
             }
             MenuItem {
-                text: "Select bank puzzle"
+                text: qsTr("Select bank puzzle")
                 onClicked: pageStack.push(Qt.resolvedUrl("PuzzlePickerPage.qml"))
             }
             MenuItem {
-                text: "Restart puzzle"
-                onClicked: {
-                    sherlockEngine.restartCurrentPuzzle()
-                }
-            }
-            MenuItem {
-                text: "Undo"
-                enabled: sherlockEngine.canUndo
-                onClicked: sherlockEngine.undo()
-            }
-            MenuItem {
-                text: "Redo"
-                enabled: sherlockEngine.canRedo
-                onClicked: sherlockEngine.redo()
-            }
-            MenuItem {
-                text: "Verify"
-                onClicked: sherlockEngine.verify()
-            }
-            MenuItem {
-                text: "Hint"
-                enabled: !sherlockEngine.solved
-                onClicked: sherlockEngine.hint()
-            }
-            MenuItem {
-                text: "Apply hint"
-                enabled: sherlockEngine.hasHint && !sherlockEngine.solved
-                onClicked: sherlockEngine.applyHint()
-            }
-            MenuItem {
-                text: "Settings"
+                text: qsTr("Settings")
                 onClicked: pageStack.push(Qt.resolvedUrl("SettingsPage.qml"))
             }
             MenuItem {
-                text: "Scores"
-                onClicked: pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
-            }
-            MenuItem {
-                text: "Game Rules"
-                onClicked: pageStack.push(Qt.resolvedUrl("RulesPage.qml"))
-            }
-            MenuItem {
-                text: "About"
+                text: qsTr("About")
                 onClicked: pageStack.push(Qt.resolvedUrl("AboutPage.qml"))
-            }
-            MenuItem {
-                text: "Reveal Solution (debug)"
-                onClicked: sherlockEngine.revealSolution()
             }
         }
 
@@ -174,6 +164,10 @@ Connections {
             id: solvedPopup
             onNextPuzzleRequested: sherlockEngine.nextPuzzleAccordingToMode()
             onScoresRequested: pageStack.push(Qt.resolvedUrl("ScoresPage.qml"))
+        }
+
+        RemorsePopup {
+            id: restartRemorse
         }
 
         Column
@@ -208,7 +202,7 @@ Connections {
                     anchors.rightMargin: Theme.horizontalPageMargin
                     anchors.verticalCenter: parent.verticalCenter
 
-                    text: "Sherlock"
+                    text: qsTr("Sherlock")
                     // PageHeader-like look:
                     font.pixelSize: Theme.fontSizeLarge
                     font.bold: true
@@ -256,10 +250,10 @@ Connections {
                             if (bankRow.isBank) {
                                 var total = bankRow.bankTotal > 0 ? bankRow.bankTotal : 1000
                                 var t = "#" + (bankRow.bankId + 1) + "/" + total + " (" + n + "×" + n + ")"
-                                if (bankRow.bankSolved) t += " (Solved!)"
+                                if (bankRow.bankSolved) t += qsTr(" (Solved!)")
                                 return t
                             } else {
-                                return "Random (" + n + "×" + n + ")"
+                                return qsTr("Random") + " (" + n + "×" + n + ")"
                             }
                         }
                     }
@@ -275,6 +269,58 @@ Connections {
                             else
                                 sherlockEngine.startRandomPuzzle()
                         }
+                    }
+                }
+            }
+
+            Row {
+                id: actionRow
+                width: parent.width
+
+                Components.GameActionButton {
+                    width: parent.width / 5
+                    symbol: "↻"
+                    text: qsTr("Restart")
+                    enabled: !sherlockEngine.solved
+                    onClicked: restartRemorse.execute(qsTr("Restarting puzzle"), function() {
+                        sherlockEngine.restartCurrentPuzzle()
+                    })
+                }
+
+                Components.GameActionButton {
+                    width: parent.width / 5
+                    symbol: "↶"
+                    text: qsTr("Undo")
+                    enabled: sherlockEngine.canUndo
+                    onClicked: sherlockEngine.undo()
+                }
+
+                Components.GameActionButton {
+                    width: parent.width / 5
+                    symbol: "↷"
+                    text: qsTr("Redo")
+                    enabled: sherlockEngine.canRedo
+                    onClicked: sherlockEngine.redo()
+                }
+
+                Components.GameActionButton {
+                    width: parent.width / 5
+                    symbol: "✓"
+                    text: qsTr("Verify")
+                    enabled: !sherlockEngine.solved
+                    onClicked: sherlockEngine.verify()
+                }
+
+                Components.GameActionButton {
+                    width: parent.width / 5
+                    symbol: sherlockEngine.hasHint ? "✓" : "?"
+                    text: sherlockEngine.hasHint ? qsTr("Apply hint") : qsTr("Hint")
+                    enabled: !sherlockEngine.solved
+                    onClicked: {
+                        if (sherlockEngine.hasHint)
+                            sherlockEngine.applyHint()
+                        else
+                            sherlockEngine.hint()
                     }
                 }
             }
@@ -300,7 +346,7 @@ Connections {
 
             // Clues under the board (Semantic DOS-style clues)
             // Uses sherlockEngine.dosClueGroups (groups: orient/index/clues; clue: type/a/b/index/given)
-            SectionHeader { text: "Clues" }
+            SectionHeader { text: qsTr("Clues") }
 
             Column {
                 id: cluePanel
@@ -308,7 +354,7 @@ Connections {
                 spacing: 2
 
                 // --- Clue icon sizing (separate from board icons) ---
-property int clueIconPx: Math.max(32, Math.min(64, Math.floor(Math.min(width, Theme.itemSizeLarge) * 0.80)))
+                property int clueIconPx: Math.max(48, Math.min(96, Math.floor(width / 7)))
                 property int clueSymbolH: Math.round(clueIconPx * 0.50)
 
                 // Vertical clue tiles should be ~1 icon wide
@@ -483,7 +529,8 @@ function rebuildHFlat() {
 }
 
 function clampIconPx(px) {
-    // Only these folders exist (and are what your provider supports)
+    // The optional SHI provider supports these two requested sizes. Bundled
+    // themes always load their high-resolution masters from icons_32x32.
     var p = Math.round(Number(px))
     if (!isFinite(p)) return 32
     return (p <= 16) ? 16 : 32
@@ -504,10 +551,10 @@ function genIconFileName(row, item) {
 }
 
 function iconUrlGenerated(row, item, px) {
-    var p = clampIconPx(px)
     var fn = genIconFileName(row, item)
     if (fn === "") return ""
-    return Qt.resolvedUrl("../assets/generated_icons/icons_" + p + "x" + p + "/" + fn) + "?e=" + sherlockEngine.iconEpoch
+    return Qt.resolvedUrl("../assets/generated_icons/" + encodeURIComponent(sherlockEngine.iconTheme)
+                          + "/icons_32x32/" + fn) + "?e=" + sherlockEngine.iconEpoch
 }
 
 function iconUrlProvider(row, item, px) {
@@ -599,14 +646,32 @@ Flickable {
             delegate: Rectangle {
                 width: verticalClues.tileW
                 height: verticalClues.tileH
-                color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
-                border.width: 1
-                border.color: clueModel.stripBorder
                 clip: true
 
                 // clue for this cell (may be null for padding cells)
                 readonly property var clue: (index < clueModel.vFlat.length) ? clueModel.vFlat[index] : null
                 readonly property var comp: (clue !== null) ? clueModel.componentForType(Number(clue.type)) : null
+                readonly property string clueKey: clue !== null && clue.key !== undefined
+                                                    ? String(clue.key) : ""
+                readonly property bool clueDimmed: clueKey !== "" &&
+                                                    sherlockEngine.dimmedClueKeys.indexOf(clueKey) >= 0
+                readonly property bool clueHinted: clueKey !== "" &&
+                                                    clueKey === sherlockEngine.hintClueKey
+
+                opacity: clueDimmed && !clueHinted ? 0.42 : 1.0
+                layer.enabled: clueDimmed && !clueHinted
+                layer.effect: dimmedClueEffect
+                color: clueHinted ? Theme.rgba("#FFC107", 0.22)
+                                  : ((index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt)
+                border.width: clueHinted ? 3 : 1
+                border.color: clueHinted ? "#FFC107" : clueModel.stripBorder
+
+                Behavior on opacity { FadeAnimation { duration: 120 } }
+
+                onClueChanged: {
+                    if (vCellLoader.item)
+                        vCellLoader.item.clueObj = clue
+                }
 
 Loader {
     id: vCellLoader
@@ -628,6 +693,12 @@ var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, ih)
 item.scale = Math.min(1.0, sx, sy)
     }
 }
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: parent.clue !== null
+                    onClicked: sherlockEngine.toggleDimmedClue(parent.clueKey)
+                }
             }
         }
     }
@@ -658,13 +729,14 @@ Item {
 }
 
 // Horizontal stripes
-// Horizontal clues: 3 columns × up to 4 rows, left-aligned (max 12)
+// Horizontal clues: 2 columns × up to 6 rows. The wider cards keep all
+// three pictures identifiable, including on narrower portrait displays.
 Item {
     id: horizontalClues
     width: parent.width
 
-    readonly property int cols: 3
-    readonly property int rows: Math.min(4, Math.max(1, Math.ceil(clueModel.hFlat.length / cols)))
+    readonly property int cols: 2
+    readonly property int rows: Math.min(6, Math.max(1, Math.ceil(clueModel.hFlat.length / cols)))
 
     readonly property int tileW: Math.floor((width - clueModel.gap * (cols - 1)) / cols)
     readonly property int tileH: Math.floor(cluePanel.clueIconPx + Theme.paddingLarge)
@@ -686,13 +758,31 @@ Item {
             delegate: Rectangle {
                 width: horizontalClues.tileW
                 height: horizontalClues.tileH
-                color: (index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt
-                border.width: 1
-                border.color: clueModel.stripBorder
                 clip: true
 
                 readonly property var clue: (index < clueModel.hFlat.length) ? clueModel.hFlat[index] : null
                 readonly property var comp: (clue !== null) ? clueModel.componentForType(Number(clue.type)) : null
+                readonly property string clueKey: clue !== null && clue.key !== undefined
+                                                    ? String(clue.key) : ""
+                readonly property bool clueDimmed: clueKey !== "" &&
+                                                    sherlockEngine.dimmedClueKeys.indexOf(clueKey) >= 0
+                readonly property bool clueHinted: clueKey !== "" &&
+                                                    clueKey === sherlockEngine.hintClueKey
+
+                opacity: clueDimmed && !clueHinted ? 0.42 : 1.0
+                layer.enabled: clueDimmed && !clueHinted
+                layer.effect: dimmedClueEffect
+                color: clueHinted ? Theme.rgba("#FFC107", 0.22)
+                                  : ((index % 2 === 0) ? clueModel.stripBg : clueModel.stripBgAlt)
+                border.width: clueHinted ? 3 : 1
+                border.color: clueHinted ? "#FFC107" : clueModel.stripBorder
+
+                Behavior on opacity { FadeAnimation { duration: 120 } }
+
+                onClueChanged: {
+                    if (hCellLoader.item)
+                        hCellLoader.item.clueObj = clue
+                }
 
                 Loader {
                     id: hCellLoader
@@ -715,6 +805,12 @@ Item {
                         var sy = (parent.height - Theme.paddingSmall*2) / Math.max(1, ih)
                         item.scale = Math.min(1.0, sx, sy)
                     }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: parent.clue !== null
+                    onClicked: sherlockEngine.toggleDimmedClue(parent.clueKey)
                 }
             }
         }
@@ -753,7 +849,7 @@ Component {
             fillMode: Image.PreserveAspectFit
             sourceSize.width: root.iconPx
             sourceSize.height: root.iconPx
-            smooth: true
+            smooth: false
         }
     }
 }
@@ -803,48 +899,6 @@ Component {
             Loader { id: aLoader; sourceComponent: clueIconTile; onLoaded: root.apply() }
             Loader { id: symLoader; sourceComponent: clueSymbol; onLoaded: root.apply() }
             Loader { id: bLoader; sourceComponent: clueIconTile; onLoaded: root.apply() }
-        }
-    }
-}
-
-Component {
-    id: clueIconComp
-
-    Item {
-        id: root
-        width: iconPx
-        height: iconPx
-
-        property int row: 0
-        property int item: 0
-        property int iconPx: cluePanel.clueIconPx
-        property bool xBox: false   // for the red-X framed icon cases
-
-        Image {
-            anchors.fill: parent
-            fillMode: Image.PreserveAspectFit
-            source: cluePanel.clueIconSource(root.row, root.item)
-            sourceSize.width: root.iconPx
-            sourceSize.height: root.iconPx
-            smooth: true
-        }
-
-        // “Red X box” overlay (DOS style)
-        Rectangle {
-            anchors.fill: parent
-            visible: root.xBox
-            color: "transparent"
-            border.width: Math.max(2, Math.floor(root.width * 0.08))
-            border.color: "red"
-            radius: Math.floor(root.width * 0.08)
-
-            Text {
-                anchors.centerIn: parent
-                text: "X"
-                color: "red"
-                font.pixelSize: Math.floor(parent.width * 0.55)
-                font.bold: true
-            }
         }
     }
 }
@@ -930,41 +984,28 @@ Component {
                                    && clueObj.c !== null
                                    && Number(clueObj.c) >= 0
 
-        function apply() {
-            if (!clueObj) return
-
-            if (aLoader.item) {
-                aLoader.item.row = clueObj.aRow
-                aLoader.item.item = clueObj.a
-                aLoader.item.iconPx = iconPx
-            }
-            if (bLoader.item) {
-                bLoader.item.row = clueObj.bRow
-                bLoader.item.item = clueObj.b
-                bLoader.item.iconPx = iconPx
-            }
-            if (cLoader.item) {
-                cLoader.item.row = clueObj.cRow
-                cLoader.item.item = clueObj.c
-                cLoader.item.iconPx = iconPx
-            }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Column {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
 
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-
-            Loader {
-                id: cLoader
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
+            Components.CluePicture {
                 visible: root.hasC
-                sourceComponent: visible ? clueIconComp : null
-                onLoaded: root.apply()
+                iconSize: root.iconPx
+                iconSource: root.clueObj && root.hasC
+                            ? cluePanel.clueIconSource(Number(root.clueObj.cRow), Number(root.clueObj.c))
+                            : ""
             }
         }
     }
@@ -996,6 +1037,7 @@ Component {
             if (!clueObj) return -1
 
             var v =
+                (clueObj.xMark !== undefined && clueObj.xMark !== null && Number(clueObj.xMark) >= 0) ? Number(clueObj.xMark) :
                 (clueObj.xboxPos !== undefined && clueObj.xboxPos !== null) ? Number(clueObj.xboxPos) :
                 (clueObj.xbox !== undefined && clueObj.xbox !== null) ? Number(clueObj.xbox) :
                 (clueObj.xboxIndex !== undefined && clueObj.xboxIndex !== null) ? Number(clueObj.xboxIndex) :
@@ -1006,47 +1048,32 @@ Component {
             return hasC ? 2 : 1
         })()
 
-        function apply() {
-            if (!clueObj) return
-
-            if (aLoader.item) {
-                aLoader.item.row = clueObj.aRow
-                aLoader.item.item = clueObj.a
-                aLoader.item.iconPx = iconPx
-                aLoader.item.xBox = (root.xboxPos === 0)
-            }
-
-            if (bLoader.item) {
-                bLoader.item.row = clueObj.bRow
-                bLoader.item.item = clueObj.b
-                bLoader.item.iconPx = iconPx
-                bLoader.item.xBox = (root.xboxPos === 1)
-            }
-
-            if (cLoader.item) {
-                cLoader.item.row = clueObj.cRow
-                cLoader.item.item = clueObj.c
-                cLoader.item.iconPx = iconPx
-                cLoader.item.xBox = (root.xboxPos === 2)
-            }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Column {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
             visible: !!root.clueObj
 
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-
-            Loader {
-                id: cLoader
+            Components.CluePicture {
+                iconSize: root.iconPx
+                crossed: root.xboxPos === 0
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                crossed: root.xboxPos === 1
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
+            Components.CluePicture {
                 visible: root.hasC
-                sourceComponent: visible ? clueIconComp : null
-                onLoaded: root.apply()
+                iconSize: root.iconPx
+                crossed: root.xboxPos === 2
+                iconSource: root.clueObj && root.hasC
+                            ? cluePanel.clueIconSource(Number(root.clueObj.cRow), Number(root.clueObj.c))
+                            : ""
             }
         }
     }
@@ -1065,17 +1092,6 @@ Component {
         implicitWidth: col.implicitWidth
         implicitHeight: col.implicitHeight
 
-        function apply() {
-            if (!clueObj) return
-
-            if (aLoader.item) { aLoader.item.row = clueObj.aRow; aLoader.item.item = clueObj.a; aLoader.item.iconPx = iconPx }
-            if (bLoader.item) { bLoader.item.row = clueObj.bRow; bLoader.item.item = clueObj.b; bLoader.item.iconPx = iconPx }
-            if (cLoader.item) { cLoader.item.row = clueObj.cRow; cLoader.item.item = clueObj.c; cLoader.item.iconPx = iconPx }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Column {
             id: col
             anchors.left: parent.left
@@ -1084,10 +1100,20 @@ Component {
             visible: !!root.clueObj
 
             // A
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
 
             // B
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
 
             // up/down arrow marker between B and C
             Loader {
@@ -1096,7 +1122,12 @@ Component {
             }
 
             // C
-            Loader { id: cLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.cRow), Number(root.clueObj.c))
+                            : ""
+            }
         }
     }
 }
@@ -1113,23 +1144,24 @@ Component {
         property var clueObj: null
         property int iconPx: cluePanel.clueIconPx
 
-        function apply() {
-            if (!clueObj) return
-            if (aLoader.item) { aLoader.item.row = clueObj.aRow; aLoader.item.item = clueObj.a; aLoader.item.iconPx = iconPx }
-            if (bLoader.item) { bLoader.item.row = clueObj.bRow; bLoader.item.item = clueObj.b; bLoader.item.iconPx = iconPx }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Row {
             anchors.centerIn: parent
             spacing: Theme.paddingSmall
             visible: !!root.clueObj
 
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
             Loader { sourceComponent: clueDotsTile }   // the 3-dot middle tile
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
         }
     }
 }
@@ -1151,42 +1183,29 @@ Component {
                                    && clueObj.c !== null
                                    && Number(clueObj.c) >= 0
 
-        function apply() {
-            if (!clueObj) return
-
-            if (aLoader.item) {
-                aLoader.item.row = clueObj.aRow
-                aLoader.item.item = clueObj.a
-                aLoader.item.iconPx = iconPx
-            }
-            if (bLoader.item) {
-                bLoader.item.row = clueObj.bRow
-                bLoader.item.item = clueObj.b
-                bLoader.item.iconPx = iconPx
-            }
-            if (cLoader.item) {
-                cLoader.item.row = clueObj.cRow
-                cLoader.item.item = clueObj.c
-                cLoader.item.iconPx = iconPx
-            }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Row {
             anchors.centerIn: parent
-            spacing: Theme.paddingSmall
+            spacing: 0
             visible: !!root.clueObj
 
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-
-            Loader {
-                id: cLoader
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
+            Components.CluePicture {
                 visible: root.hasC
-                sourceComponent: visible ? clueIconComp : null
-                onLoaded: root.apply()
+                iconSize: root.iconPx
+                iconSource: root.clueObj && root.hasC
+                            ? cluePanel.clueIconSource(Number(root.clueObj.cRow), Number(root.clueObj.c))
+                            : ""
             }
         }
     }
@@ -1209,48 +1228,30 @@ Component {
                                    && clueObj.c !== null
                                    && Number(clueObj.c) >= 0
 
-        function apply() {
-            if (!clueObj) return
-
-            if (aLoader.item) {
-                aLoader.item.row = clueObj.aRow
-                aLoader.item.item = clueObj.a
-                aLoader.item.iconPx = iconPx
-                aLoader.item.xBox = false
-            }
-
-            if (bLoader.item) {
-                bLoader.item.row = clueObj.bRow
-                bLoader.item.item = clueObj.b
-                bLoader.item.iconPx = iconPx
-                // In BOTH 2-icon and 3-icon variants, B is the red-X boxed item
-                bLoader.item.xBox = true
-            }
-
-            if (cLoader.item) {
-                cLoader.item.row = clueObj.cRow
-                cLoader.item.item = clueObj.c
-                cLoader.item.iconPx = iconPx
-                cLoader.item.xBox = false
-            }
-        }
-
-        onClueObjChanged: apply()
-        Component.onCompleted: apply()
-
         Row {
             anchors.centerIn: parent
-            spacing: Theme.paddingSmall
+            spacing: 0
             visible: !!root.clueObj
 
-            Loader { id: aLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-            Loader { id: bLoader; sourceComponent: clueIconComp; onLoaded: root.apply() }
-
-            Loader {
-                id: cLoader
+            Components.CluePicture {
+                iconSize: root.iconPx
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.aRow), Number(root.clueObj.a))
+                            : ""
+            }
+            Components.CluePicture {
+                iconSize: root.iconPx
+                crossed: true
+                iconSource: root.clueObj
+                            ? cluePanel.clueIconSource(Number(root.clueObj.bRow), Number(root.clueObj.b))
+                            : ""
+            }
+            Components.CluePicture {
                 visible: root.hasC
-                sourceComponent: visible ? clueIconComp : null
-                onLoaded: root.apply()
+                iconSize: root.iconPx
+                iconSource: root.clueObj && root.hasC
+                            ? cluePanel.clueIconSource(Number(root.clueObj.cRow), Number(root.clueObj.c))
+                            : ""
             }
         }
     }
@@ -1262,12 +1263,4 @@ Component {
         }
     }
 
-    Component
-    {
-        id: pickerPage
-        FilePickerPage {
-            title: "Select sherlock.shi"
-            nameFilters: [ "*.shi", "*.*" ]
-        }
-    }
 }

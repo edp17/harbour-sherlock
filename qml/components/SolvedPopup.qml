@@ -1,3 +1,21 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
@@ -29,9 +47,9 @@ Item {
 
     function difficultyName(d) {
         d = Number(d)
-        if (d === 0) return "Easy"
-        if (d === 1) return "Medium"
-        if (d === 2) return "Hard"
+        if (d === 0) return qsTr("Easy")
+        if (d === 1) return qsTr("Medium")
+        if (d === 2) return qsTr("Hard")
         return "" + d
     }
 
@@ -75,7 +93,7 @@ Item {
                 spacing: Theme.paddingMedium
 
                 Label {
-                    text: "Solved!"
+                    text: qsTr("Solved!")
                     color: Theme.primaryColor
                     font.pixelSize: Theme.fontSizeLarge
                     font.bold: true
@@ -91,19 +109,19 @@ Item {
             }
 
             Label {
-                text: "Time: " + formatTime(pop.elapsedSeconds)
+                text: qsTr("Time: %1").arg(formatTime(pop.elapsedSeconds))
                 color: Theme.primaryColor
                 font.pixelSize: Theme.fontSizeMedium
             }
 
             Label {
-                text: "Player: " + (pop.playerName && pop.playerName.length ? pop.playerName : "—")
+                text: qsTr("Player: %1").arg(pop.playerName && pop.playerName.length ? pop.playerName : "—")
                 color: Theme.primaryColor
                 font.pixelSize: Theme.fontSizeMedium
             }
 
             Label {
-                text: "Difficulty: " + difficultyName(pop.difficulty)
+                text: qsTr("Difficulty: %1").arg(difficultyName(pop.difficulty))
                 color: Theme.primaryColor
                 font.pixelSize: Theme.fontSizeMedium
             }
@@ -113,7 +131,7 @@ Item {
                 spacing: Theme.paddingMedium
 
                 Button {
-                    text: "Next puzzle"
+                    text: qsTr("Next puzzle")
                     width: (parent.width - Theme.paddingMedium) / 2
                     onClicked: {
                         pop.close()
@@ -122,7 +140,7 @@ Item {
                 }
 
                 Button {
-                    text: "Scores"
+                    text: qsTr("Scores")
                     width: (parent.width - Theme.paddingMedium) / 2
                     onClicked: {
                         pop.close()

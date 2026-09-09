@@ -1,9 +1,28 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.0
 import Sailfish.Silica 1.0
 import "../"
 
 Page {
     id: page
+    allowedOrientations: Orientation.All
 
     function fmtTime(sec) {
         sec = Number(sec)
@@ -18,9 +37,9 @@ Page {
         if (src === "bank") {
             var id = Number(rec.puzzleId)
             if (!isFinite(id)) id = 0
-            return "Bank #" + (id + 1)
+            return qsTr("Bank #%1").arg(id + 1)
         }
-        return "Random"
+        return qsTr("Random")
     }
 
     function top10() {
@@ -48,17 +67,19 @@ Page {
 
         PullDownMenu {
             MenuItem {
-                text: "Clear scores"
+                text: qsTr("Clear scores")
                 onClicked: sherlockEngine.clearScores()
             }
         }
+
+        VerticalScrollDecorator { }
 
         Column {
             id: column
             width: parent.width
             spacing: Theme.paddingMedium
 
-            PageHeader { title: "Scores" }
+            PageHeader { title: qsTr("Scores") }
 
             Label {
                 x: Theme.horizontalPageMargin
@@ -66,7 +87,7 @@ Page {
                 wrapMode: Text.Wrap
                 font.pixelSize: Theme.fontSizeSmall
                 color: Theme.secondaryColor
-                text: "Top 10 quickest games"
+                text: qsTr("Top 10 quickest games")
             }
 
             Repeater {
@@ -85,18 +106,21 @@ Page {
 
                         Label {
                             width: parent.width * 0.42
+                            font.pixelSize: Theme.fontSizeSmall
                             elide: Text.ElideRight
                             text: puzzleLabel(modelData) + " (" + modelData.size + "×" + modelData.size + ")"
                         }
 
                         Label {
                             width: parent.width * 0.22
+                            font.pixelSize: Theme.fontSizeSmall
                             horizontalAlignment: Text.AlignRight
                             text: fmtTime(modelData.elapsedSeconds)
                         }
 
                         Label {
                             width: parent.width * 0.30
+                            font.pixelSize: Theme.fontSizeSmall
                             elide: Text.ElideRight
                             horizontalAlignment: Text.AlignRight
                             text: (modelData.playerName && modelData.playerName.length > 0) ? modelData.playerName : "-"

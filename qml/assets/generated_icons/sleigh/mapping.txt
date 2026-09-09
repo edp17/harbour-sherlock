@@ -1,0 +1,50 @@
+Christmas theme
+Letters: SLEIGH
+
+Characters
+  A1: Santa
+  A2: Mrs Claus
+  A3: elf
+  A4: snowman
+  A5: reindeer
+  A6: nutcracker
+
+Objects
+  B1: gift
+  B2: Christmas tree
+  B3: wreath
+  B4: candy cane
+  B5: bells
+  B6: gingerbread house
+
+Numbers
+  C1: I
+  C2: II
+  C3: III
+  C4: IV
+  C5: V
+  C6: VI
+
+Food / drinks
+  D1: hot chocolate
+  D2: mulled wine
+  D3: milk
+  D4: hot punch
+  D5: sparkling drink
+  D6: Christmas cookies
+
+Transport / scenes
+  E1: sleigh
+  E2: Christmas train
+  E3: snowy church
+  E4: reindeer team
+  E5: Santa sack
+  E6: Christmas star village
+
+Letters
+  F1: S
+  F2: L
+  F3: E
+  F4: I
+  F5: G
+  F6: H

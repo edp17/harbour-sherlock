@@ -1,3 +1,21 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
@@ -59,7 +77,7 @@ Page {
 
         PullDownMenu {
             MenuItem {
-                text: "Clear solved marks (this size)"
+                text: qsTr("Clear solved marks for this size")
                 onClicked: {
                     sherlockEngine.clearSolvedBankPuzzles()
                     refreshEntries()
@@ -72,7 +90,7 @@ Page {
             width: parent.width
             spacing: Theme.paddingLarge
 
-            PageHeader { title: "Select puzzle (" + n + "×" + n + ")" }
+            PageHeader { title: qsTr("Select puzzle (%1×%1)").arg(n) }
 
             Row {
                 id: jumpRow
@@ -83,13 +101,14 @@ Page {
                 TextField {
                     id: jumpField
                     width: parent.width - goButton.width - Theme.paddingMedium
-                    placeholderText: "Go to puzzle # (1–" + entries.length + ")"
+                    placeholderText: qsTr("Go to puzzle number (1–%1)").arg(entries.length)
+                    label: qsTr("Puzzle number")
                     inputMethodHints: Qt.ImhDigitsOnly
                 }
 
                 Button {
                     id: goButton
-                    text: "Go"
+                    text: qsTr("Go")
                     onClicked: jumpToId(jumpField.text)
                 }
             }

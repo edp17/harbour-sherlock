@@ -8,4 +8,6 @@ X-Sailfish-ApplicationType=Silica
 
 
 [X-Sailjail]
-Sandboxing=Disabled
+Permissions=
+OrganizationName=edp17
+ApplicationName=harbour-sherlock

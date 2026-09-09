@@ -1,10 +1,10 @@
 Name:       harbour-sherlock
-Version:    0.1.0
-Release:    39
+Version:    1.0.0
+Release:    0.0.0
 Summary:    Sherlock logic deduction puzzle (6x6) for Sailfish OS
-License:    BSD-3-Clause
+License:    GPL-3.0-or-later
 Group:      Applications/Games
-URL:        https://example.invalid
+URL:        https://github.com/edp17/harbour-sherlock
 Source0:    %{name}-%{version}.tar.bz2
 
 BuildRequires: cmake
@@ -14,12 +14,14 @@ BuildRequires: pkgconfig(Qt5Qml)
 BuildRequires: pkgconfig(Qt5Quick)
 BuildRequires: pkgconfig(sailfishapp)
 BuildRequires: sailfishsilica-qt5-devel
+BuildRequires: qt5-qttools-linguist
 
 Requires: sailfishsilica-qt5
 
 %description
 A Sailfish OS implementation of the classic Sherlock 6x6 logic deduction puzzle.
-Does not ship original assets; user may import sherlock.shi.
+Discovers selectable replacement-art themes from installed theme folders and
+can also import sherlock.shi.
 
 %prep
 %setup -q

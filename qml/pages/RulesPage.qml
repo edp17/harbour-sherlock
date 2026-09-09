@@ -1,350 +1,376 @@
-import QtQuick 2.0
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
+import QtQuick 2.6
 import Sailfish.Silica 1.0
+
+import "../components" as Components
 
 Page {
     id: page
+    allowedOrientations: Orientation.All
 
-    // Expect you already expose sherlockEngine as a context property in your app root.
-    // If it’s instead passed in, you can add: property var sherlockEngine
-
-    function genIconFileName(row, item) {
-        var baseN = 6
-        var rr = Number(row)
-        var ii = Number(item)
-        if (!isFinite(rr) || !isFinite(ii)) return ""
-        rr = Math.max(0, Math.min(baseN - 1, rr))
-        ii = Math.max(0, Math.min(baseN - 1, ii))
-        var idx = rr * baseN + ii + 1
-        var idx2 = (idx < 10 ? "0" : "") + idx
-        var rowLetter = String.fromCharCode("A".charCodeAt(0) + rr)
-        var colNumber = ii + 1
-        return idx2 + "_" + rowLetter + colNumber + ".png"
-    }
-
-    function iconSourceFor(row, item) {
-        var rr = Number(row)
-        var ii = Number(item)
-        if (!isFinite(rr) || !isFinite(ii)) return ""
-
-        // sherlockEngine.iconSource: 0 = generated icons, else image provider
-        if (sherlockEngine && sherlockEngine.iconSource === 0) {
-            var fn = genIconFileName(rr, ii)
-            if (fn === "") return ""
-            return Qt.resolvedUrl("../assets/generated_icons/icons_32x32/" + fn) + "?e=" + sherlockEngine.iconEpoch
-        }
-
-        // Uses your C++ image provider naming from GamePage.qml :contentReference[oaicite:1]{index=1}
-        return "image://sherlock/r" + rr + "_i" + ii + "?e=" + (sherlockEngine ? sherlockEngine.iconEpoch : 0)
-    }
-
-    function arrowForType(t) {
-        t = Number(t)
-        if (t === 1) return "\u2192" // LeftOf :contentReference[oaicite:2]{index=2}
-        if (t === 2) return "\u2191" // Above :contentReference[oaicite:3]{index=3}
-        return "\u2192"
-    }
+    readonly property real exampleIconSize: Math.min(
+        Theme.itemSizeMedium,
+        (width - 4 * Theme.horizontalPageMargin) / 3.4)
 
     Component {
-        id: bulletRow
-        Row {
-            width: parent.width
-            spacing: Theme.paddingMedium
-
-            Rectangle {
-                width: Theme.paddingLarge
-                height: Theme.paddingLarge
-                radius: Theme.paddingSmall
-                color: Theme.highlightBackgroundColor
-            }
-
-            Label {
-                width: parent.width - Theme.horizontalPageMargin * 2 - Theme.paddingLarge - Theme.paddingMedium
-                wrapMode: Text.WordWrap
-                text: modelData
-            }
-        }
-    }
-
-    Component {
-        id: exampleClueRow
+        id: bulletDelegate
 
         Item {
-            id: wrapper
             width: parent ? parent.width : page.width
+            height: bulletText.implicitHeight + Theme.paddingSmall
 
-            // Give it a real height (writable), so Loader can reserve space.
-            height: Math.max(leftIcon.height, rightIcon.height, arrowLabel.implicitHeight, descLabel.implicitHeight)
+            Label {
+                id: bullet
+                x: Theme.horizontalPageMargin
+                text: "•"
+                color: Theme.highlightColor
+            }
+
+            Label {
+                id: bulletText
+                anchors.left: bullet.right
+                anchors.leftMargin: Theme.paddingMedium
+                anchors.right: parent.right
+                anchors.rightMargin: Theme.horizontalPageMargin
+                wrapMode: Text.WordWrap
+                text: modelData
+                color: Theme.primaryColor
+            }
+        }
+    }
+
+    Component {
+        id: dotsTile
+
+        Item {
+            width: page.exampleIconSize
+            height: page.exampleIconSize
+
+            Rectangle {
+                anchors.fill: parent
+                color: "#d6c84b"
+                border.width: 2
+                border.color: "#6a6a6a"
+                radius: Theme.paddingSmall
+            }
 
             Row {
-                id: row
-                width: parent.width
-                spacing: Theme.paddingMedium
+                anchors.centerIn: parent
+                spacing: Theme.paddingSmall
 
-                Image {
-                    id: leftIcon
-                    width: Theme.iconSizeMedium
-                    height: Theme.iconSizeMedium
-                    sourceSize.width: width
-                    sourceSize.height: height
-                    fillMode: Image.PreserveAspectFit
-                    smooth: false
-                    source: iconSourceFor(0, 0)
-                }
-
-                Label {
-                    id: arrowLabel
-                    text: arrowForType(1)
-                    font.pixelSize: Theme.fontSizeLarge
-                    font.bold: true
-                    verticalAlignment: Text.AlignVCenter
-                }
-
-                Image {
-                    id: rightIcon
-                    width: Theme.iconSizeMedium
-                    height: Theme.iconSizeMedium
-                    sourceSize.width: width
-                    sourceSize.height: height
-                    fillMode: Image.PreserveAspectFit
-                    smooth: false
-                    source: iconSourceFor(0, 1)
-                }
-
-                Label {
-                    id: descLabel
-                    width: Math.max(0,
-                                    parent.width
-                                    - (Theme.iconSizeMedium * 2)
-                                    - (Theme.paddingMedium * 2)
-                                    - Theme.fontSizeLarge)
-                    text: "means: left item is left of right item"
-                    wrapMode: Text.WordWrap
-                    color: Theme.secondaryColor
-                    verticalAlignment: Text.AlignVCenter
+                Repeater {
+                    model: 3
+                    Rectangle {
+                        width: Math.max(4, page.exampleIconSize * 0.12)
+                        height: width
+                        radius: width / 2
+                        color: "#2d61ff"
+                    }
                 }
             }
         }
     }
-
-function midTextForRulesExample(type, index1based) {
-    if (type === 1) return "\u2192" // LeftOf
-    if (type === 2) return "\u2191" // Above
-    if (type === 8) return "" + index1based        // IsInCol/IsInRow (displayed as number only)
-    if (type === 10) return "\u2260 " + index1based // NotInCol/NotInRow (≠ N)
-    return "?"
-}
-
-Component {
-    id: exampleArrowClueRow
-
-    Item {
-        width: parent ? parent.width : page.width
-        height: Math.max(leftIcon.height, rightIcon.height, midLabel.implicitHeight, descLabel.implicitHeight)
-
-        Row {
-            id: row
-            width: parent.width
-            spacing: Theme.paddingMedium
-
-            Image {
-                id: leftIcon
-                width: Theme.iconSizeMedium
-                height: Theme.iconSizeMedium
-                sourceSize.width: width
-                sourceSize.height: height
-                fillMode: Image.PreserveAspectFit
-                smooth: false
-                source: iconSourceFor(0, 0)
-            }
-
-            Label {
-                id: midLabel
-                text: midTextForRulesExample(1, 0) // →
-                font.pixelSize: Theme.fontSizeSmall
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Image {
-                id: rightIcon
-                width: Theme.iconSizeMedium
-                height: Theme.iconSizeMedium
-                sourceSize.width: width
-                sourceSize.height: height
-                fillMode: Image.PreserveAspectFit
-                smooth: false
-                source: iconSourceFor(0, 1)
-            }
-
-            Label {
-                id: descLabel
-                width: Math.max(0, parent.width - (Theme.iconSizeMedium * 2) - Theme.paddingMedium * 2 - Theme.fontSizeLarge)
-                text: "means: left icon is left of right icon"
-                wrapMode: Text.WordWrap
-                color: Theme.secondaryColor
-                verticalAlignment: Text.AlignVCenter
-            }
-        }
-    }
-}
-
-Component {
-    id: examplePlacementClueRow
-
-    // parameterized via properties set by Loader
-    Item {
-        id: wrapper
-        width: parent ? parent.width : page.width
-
-        property int type: 8              // 8=IsInCol/IsInRow, 10=NotInCol/NotInRow
-        property int index1based: 3
-        property string description: ""
-
-        height: Math.max(icon.height, mid.implicitHeight, desc.implicitHeight)
-
-        Row {
-            width: parent.width
-            spacing: Theme.paddingMedium
-
-            Image {
-                id: icon
-                width: Theme.iconSizeMedium
-                height: Theme.iconSizeMedium
-                sourceSize.width: width
-                sourceSize.height: height
-                fillMode: Image.PreserveAspectFit
-                smooth: false
-                source: iconSourceFor(0, 0)
-            }
-
-            Label {
-                id: mid
-                text: midTextForRulesExample(wrapper.type, wrapper.index1based)
-                font.pixelSize: Theme.fontSizeSmall
-                font.bold: true
-                verticalAlignment: Text.AlignVCenter
-            }
-
-            Label {
-                id: desc
-                width: Math.max(0, parent.width - Theme.iconSizeMedium - Theme.paddingMedium * 2 - Theme.fontSizeLarge)
-                text: wrapper.description
-                wrapMode: Text.WordWrap
-                color: Theme.secondaryColor
-                verticalAlignment: Text.AlignVCenter
-            }
-        }
-    }
-}
 
     SilicaFlickable {
         anchors.fill: parent
-
-        contentHeight: contentColumn.height
-
-        Column {
-            id: contentColumn
-            width: parent.width
-            spacing: Theme.paddingLarge
-
-            PageHeader { title: "Game rules" }
-
-            // Keep left/right margins consistent with Silica pages
-            Column {
-                width: parent.width - 2 * Theme.horizontalPageMargin
-                x: Theme.horizontalPageMargin
-                spacing: Theme.paddingLarge
-
-                Label {
-                    width: parent.width
-                    wrapMode: Text.WordWrap
-                    text: "Goal: determine the correct item in every cell. Each cell ends with exactly one certain item."
-                }
-
-                SectionHeader { text: "Marking" }
-
-                Repeater {
-                    model: [
-                        "Tap candidates to toggle them on/off.",
-                        "Set a cell to a single certain item (the cell shows a large icon).",
-                        "Givens are locked and cannot be changed.",
-                        "Undo/Redo restores your previous states (including across restart)."
-                    ]
-                    delegate: bulletRow
-                }
-
-                SectionHeader { text: "Magnifier" }
-
-                Repeater {
-                    model: [
-                        "Long-press anywhere inside a cell to open the magnifier popup.",
-                        "You can disable the magnifier in Settings."
-                    ]
-                    delegate: bulletRow
-                }
-
-SectionHeader { text: "Clues" }
-
-Label {
-    width: parent.width
-    wrapMode: Text.WordWrap
-    text: "Clues describe relationships between icons. Clues are shown in DOS-style stripes:"
-}
-
-Repeater {
-    model: [
-        "Vertical stripes are column clues. The number refers to a column (1.." + (sherlockEngine ? sherlockEngine.size : 6) + ").",
-        "Horizontal stripes are row clues. The number refers to a row (1.." + (sherlockEngine ? sherlockEngine.size : 6) + ").",
-        "Arrows show relative position: → (left of) and ↑ (above)."
-    ]
-    delegate: bulletRow
-}
-
-// Example: pairwise arrow clue
-Loader {
-    width: parent.width
-    sourceComponent: exampleArrowClueRow
-    height: item ? item.height : 0
-}
-
-// Example: placement clue (number only)
-Loader {
-    width: parent.width
-    sourceComponent: examplePlacementClueRow
-    height: item ? item.height : 0
-    onLoaded: {
-        item.type = 8
-        item.index1based = 3
-        item.description = "means: this icon is in column/row 3 (stripe orientation tells which)"
-    }
-}
-
-// Example: negative placement clue (≠ number)
-Loader {
-    width: parent.width
-    sourceComponent: examplePlacementClueRow
-    height: item ? item.height : 0
-    onLoaded: {
-        item.type = 10
-        item.index1based = 3
-        item.description = "means: this icon is NOT in column/row 3 (stripe orientation tells which)"
-    }
-}
-
-                SectionHeader { text: "Timer & score" }
-
-                Repeater {
-                    model: [
-                        "The timer starts on your first action and persists across restart.",
-                        "When solved, your time is recorded on the Scores page."
-                    ]
-                    delegate: bulletRow
-                }
-
-                Item { width: 1; height: Theme.paddingLarge }
-            }
-        }
+        contentHeight: content.height + Theme.paddingLarge
 
         VerticalScrollDecorator { }
+
+        Column {
+            id: content
+            width: parent.width
+            spacing: Theme.paddingMedium
+
+            PageHeader { title: qsTr("Game rules") }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                wrapMode: Text.WordWrap
+                text: qsTr("Place each row's icons into their correct columns. Every icon occurs exactly once in its row; icons in different rows are separate categories and may share the same column.")
+            }
+
+            SectionHeader { text: qsTr("Using the board") }
+
+            Repeater {
+                model: [
+                    qsTr("Tap a small candidate to remove or restore it."),
+                    qsTr("Press and hold a candidate to make it certain. If the magnifier is enabled, press and hold to open the larger editor instead."),
+                    qsTr("Given cells have a highlighted border and cannot be changed."),
+                    qsTr("Use Clear cell in the magnifier to restore every candidate in that cell.")
+                ]
+                delegate: bulletDelegate
+            }
+
+            SectionHeader { text: qsTr("Vertical clues") }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                wrapMode: Text.WordWrap
+                color: Theme.secondaryColor
+                text: qsTr("Vertical cards compare icons from different rows. Their vertical arrangement refers to columns, not to rows on the board.")
+            }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Same column")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize * 3 + 2 * Theme.paddingSmall
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingLarge
+
+                    Column {
+                        spacing: Theme.paddingSmall
+                        Components.RuleIcon { row: 0; item: 0; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 1; item: 2; iconSize: page.exampleIconSize }
+                    }
+
+                    Column {
+                        spacing: Theme.paddingSmall
+                        Components.RuleIcon { row: 0; item: 4; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 2; item: 1; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 4; item: 3; iconSize: page.exampleIconSize }
+                    }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("Two or three icons stacked vertically are all in the same column.")
+            }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Not in the same column")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize * 3 + 2 * Theme.paddingSmall
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingLarge
+
+                    Column {
+                        spacing: Theme.paddingSmall
+                        Components.RuleIcon { row: 0; item: 1; iconSize: page.exampleIconSize }
+                        Components.RuleMarkedIcon { row: 3; item: 2; iconSize: page.exampleIconSize }
+                    }
+
+                    Column {
+                        spacing: Theme.paddingSmall
+                        Components.RuleIcon { row: 0; item: 3; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 2; item: 4; iconSize: page.exampleIconSize }
+                        Components.RuleMarkedIcon { row: 5; item: 1; iconSize: page.exampleIconSize }
+                    }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("A red X means that icon is not in the same column as the other icon, or as the aligned pair above it.")
+            }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Either/or column")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize * 3.5 + 2 * Theme.paddingSmall
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingSmall
+                    Components.RuleIcon { row: 0; item: 5; iconSize: page.exampleIconSize }
+                    Components.RuleIcon { row: 1; item: 1; iconSize: page.exampleIconSize }
+                    Label {
+                        width: page.exampleIconSize
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "↕"
+                        color: "yellow"
+                        font.bold: true
+                        font.pixelSize: Theme.fontSizeMedium
+                    }
+                    Components.RuleIcon { row: 4; item: 0; iconSize: page.exampleIconSize }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("The first icon shares a column with exactly one of the other two icons.")
+            }
+
+            SectionHeader { text: qsTr("Horizontal clues") }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Somewhere to the left")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize
+
+                Row {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingSmall
+                    Components.RuleIcon { row: 2; item: 1; iconSize: page.exampleIconSize }
+                    Loader { sourceComponent: dotsTile }
+                    Components.RuleIcon { row: 2; item: 3; iconSize: page.exampleIconSize }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("Two icons separated by dots mean the first is somewhere to the left of the second.")
+            }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Next to / between")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize * 2 + Theme.paddingSmall
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingSmall
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Components.RuleIcon { row: 3; item: 1; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 3; item: 2; iconSize: page.exampleIconSize }
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Components.RuleIcon { row: 4; item: 1; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 4; item: 2; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 4; item: 3; iconSize: page.exampleIconSize }
+                    }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("Touching icons are in neighbouring columns. With three icons, the middle picture is between the outer pair in three consecutive columns.")
+            }
+
+            Label {
+                width: parent.width
+                horizontalAlignment: Text.AlignHCenter
+                color: Theme.secondaryHighlightColor
+                font.pixelSize: Theme.fontSizeSmall
+                text: qsTr("Not next to / not between")
+            }
+
+            Item {
+                width: parent.width
+                height: page.exampleIconSize * 2 + Theme.paddingSmall
+
+                Column {
+                    anchors.centerIn: parent
+                    spacing: Theme.paddingSmall
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Components.RuleIcon { row: 5; item: 0; iconSize: page.exampleIconSize }
+                        Components.RuleMarkedIcon { row: 5; item: 3; iconSize: page.exampleIconSize }
+                    }
+
+                    Row {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 0
+                        Components.RuleIcon { row: 1; item: 0; iconSize: page.exampleIconSize }
+                        Components.RuleMarkedIcon { row: 1; item: 3; iconSize: page.exampleIconSize }
+                        Components.RuleIcon { row: 1; item: 5; iconSize: page.exampleIconSize }
+                    }
+                }
+            }
+
+            Label {
+                width: parent.width - 2 * Theme.horizontalPageMargin
+                x: Theme.horizontalPageMargin
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.WordWrap
+                text: qsTr("The crossed icon is not next to the other icon. In the three-icon form, the outer pictures are two columns apart and the crossed picture is not between them.")
+            }
+
+            SectionHeader { text: qsTr("Game actions") }
+
+            Repeater {
+                model: [
+                    qsTr("Restart clears the current puzzle after a brief confirmation delay."),
+                    qsTr("Undo and Redo move through your recent board states."),
+                    qsTr("Verify highlights cells where the correct candidate has been removed."),
+                    qsTr("Hint highlights a clue, a cell and the candidate to change. A check mark means make it certain; a cross means remove it. Tap Apply hint to perform the move."),
+                    qsTr("Tap a clue to dim it in greyscale. Tap it again to restore its colours."),
+                    qsTr("The timer starts with your first board action. Completed times appear on the Scores page.")
+                ]
+                delegate: bulletDelegate
+            }
+        }
     }
 }

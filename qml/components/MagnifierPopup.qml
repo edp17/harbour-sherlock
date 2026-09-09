@@ -1,3 +1,21 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
@@ -64,7 +82,8 @@ Item {
         if (sherlockEngine.iconSource === 0) {
             var fn = genIconFileName(rr, ii)
             if (fn === "") return ""
-            return Qt.resolvedUrl("../assets/generated_icons/icons_32x32/" + fn) + "?e=" + sherlockEngine.iconEpoch
+            return Qt.resolvedUrl("../assets/generated_icons/" + encodeURIComponent(sherlockEngine.iconTheme)
+                                  + "/icons_32x32/" + fn) + "?e=" + sherlockEngine.iconEpoch
         }
         rr = Math.max(0, Math.min(iconBankN - 1, rr))
         ii = Math.max(0, Math.min(iconBankN - 1, ii))
@@ -122,7 +141,9 @@ Item {
                 spacing: Theme.paddingMedium
 
                 Label {
-                    text: "Row " + String.fromCharCode("A".charCodeAt(0) + pop.row) + " • Col " + (pop.col + 1)
+                    text: qsTr("Row %1 • Column %2")
+                              .arg(String.fromCharCode("A".charCodeAt(0) + pop.row))
+                              .arg(pop.col + 1)
                     color: Theme.primaryColor
                     font.pixelSize: Theme.fontSizeMedium
                     width: parent.width - closeBtn.width - Theme.paddingMedium
@@ -155,7 +176,7 @@ Item {
                 Label {
                     anchors.centerIn: parent
                     visible: !pop.isCertain
-                    text: "Not certain"
+                    text: qsTr("Not certain")
                     color: Theme.secondaryColor
                 }
             }
@@ -220,7 +241,7 @@ Item {
             }
 
             Button {
-                text: "Clear cell"
+                text: qsTr("Clear cell")
                 enabled: !sherlockEngine.fixedAt(pop.row, pop.col) && !sherlockEngine.solved
                 onClicked: {
                     sherlockEngine.timerOnUserAction()

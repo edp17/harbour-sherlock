@@ -1,3 +1,21 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
@@ -122,7 +140,7 @@ Item {
 
         source: (sherlockEngine.iconSource === 0)
                 ? Qt.resolvedUrl("../assets/generated_icons/"
-                                 + (use16px ? "icons_16x16/" : "icons_32x32/")
+                                 + encodeURIComponent(sherlockEngine.iconTheme) + "/icons_32x32/"
                                  + fileNameForCell()
                                  + "?e=" + sherlockEngine.iconEpoch)
                 : ("image://sherlock/" + (use16px ? "16" : "32") + "/" + displayOneBasedIndex
@@ -200,13 +218,19 @@ Item {
                     readonly property int cand: index
                     visible: cand < root.n
                     readonly property bool isOn: visible && ((root.mask & (1 << cand)) !== 0)
+                    readonly property bool hintedCandidate: root.hinted &&
+                                                              sherlockEngine.hintItem === cand
 
                     // Visual: dim if eliminated
-                    border.width: 1
-                    color: markCell.isOn
+                    border.width: markCell.hintedCandidate ? 3 : 1
+                    color: markCell.hintedCandidate
+                           ? Theme.rgba("#FFC107", 0.48)
+                           : markCell.isOn
                            ? Theme.rgba(Theme.highlightColor, 0.18)
                            : Theme.rgba(Theme.primaryColor, 0.04)
-                    border.color: markCell.isOn
+                    border.color: markCell.hintedCandidate
+                           ? "#FFC107"
+                           : markCell.isOn
                            ? Theme.rgba(Theme.primaryColor, 0.30)
                            : Theme.rgba(Theme.primaryColor, 0.18)
 
@@ -225,7 +249,7 @@ Item {
                             cache: true
                             asynchronous: true
                             source: Qt.resolvedUrl("../assets/generated_icons/"
-                                                  + (use16px ? "icons_16x16/" : "icons_32x32/")
+                                                  + encodeURIComponent(sherlockEngine.iconTheme) + "/icons_32x32/"
                                                   + genBankFile(root.rowIndex, markCell.cand)
                                                   + "?e=" + sherlockEngine.iconEpoch)
                             opacity: markCell.isOn ? 1.0 : 0.22
@@ -242,6 +266,19 @@ Item {
                             color: Theme.rgba(Theme.primaryColor, markCell.isOn ? 0.95 : 0.35)
                             visible: candImg.status !== Image.Ready
                         }
+                    }
+
+                    Label {
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.margins: 1
+                        visible: markCell.hintedCandidate
+                        text: sherlockEngine.hintEliminates ? "×" : "✓"
+                        font.pixelSize: Math.max(12, Math.floor(parent.width * 0.48))
+                        font.bold: true
+                        color: sherlockEngine.hintEliminates
+                               ? Theme.errorColor : Theme.highlightColor
+                        z: 3
                     }
 
                     // Input layer

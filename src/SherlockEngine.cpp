@@ -1,29 +1,38 @@
 #include "SherlockEngine.h"
 #include "ClueSemantics.h"
+#include "ClueGenerator.h"
+#include "CandidateCompletion.h"
+#include "HintSolver.h"
 
-#include <sailfishapp.h>
-#include <QStandardPaths>
+#include <algorithm>
+#include <utility>
+#include <vector>
+
+#include <QDateTime>
+#include <QDataStream>
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
-#include <QDebug>
-#include <QPainter>
 #include <QFont>
-#include <QSettings>
-#include <QtGlobal>   // qrand/qsrand
-#include <QDateTime>
-#include <QFile>
-#include <QTextStream>
+#include <QIODevice>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonValue>
+#include <QPainter>
+#include <QSettings>
 #include <QStandardPaths>
-#include <QDir>
-#include <QDataStream>
-#include <QIODevice>
+#include <QTextStream>
 
 #include "ShiReader.h"
+
+static QString appSettingsPath()
+{
+    const QString directory = QStandardPaths::writableLocation(
+        QStandardPaths::AppConfigLocation);
+    QDir().mkpath(directory);
+    return QDir(directory).filePath(QStringLiteral("harbour-sherlock.conf"));
+}
 
 static QByteArray packSnapshots(const QVector<SherlockEngine::Snapshot> &v)
 {
@@ -103,7 +112,6 @@ SherlockEngine::SherlockEngine(QObject *parent)
 //    rebuildClues();
     QTimer::singleShot(0, this, [this]() {
         rebuildClues();
-        emit dosClueGroupsChanged();
     });
     loadScoresFromDisk();
     loadSolvedBankFromDisk(m_size);
@@ -171,8 +179,9 @@ void SherlockEngine::setDifficulty(int d)
     emit difficultyChanged();
 
     // Difficulty affects the clue set only (not the puzzle).
+    clearDimmedClues();
     rebuildDosClues();
-    emit dosClueGroupsChanged();
+    saveState();
 }
 
 void SherlockEngine::loadSolvedBankFromDisk(int size)
@@ -503,6 +512,19 @@ QVariantList SherlockEngine::dosClueGroups() const
             m["bCol"]  = c.bCol;
             m["cRow"]  = c.cRow;
             m["cCol"]  = c.cCol;
+            QStringList keyParts;
+            keyParts << QString::number(g.orient)
+                     << QString::number(g.index)
+                     << QString::number(int(c.sem.type))
+                     << QString::number(c.aRow)
+                     << QString::number(c.sem.a)
+                     << QString::number(c.bRow)
+                     << QString::number(c.sem.b)
+                     << QString::number(c.cRow)
+                     << QString::number(c.sem.c)
+                     << QString::number(c.sem.flags)
+                     << QString::number(c.sem.xMark);
+            m["key"] = keyParts.join(QLatin1Char(':'));
             list.push_back(m);
         }
 
@@ -511,6 +533,35 @@ QVariantList SherlockEngine::dosClueGroups() const
     }
 
     return out;
+}
+
+QStringList SherlockEngine::dimmedClueKeys() const
+{
+    QStringList keys = m_dimmedClueKeys.values();
+    std::sort(keys.begin(), keys.end());
+    return keys;
+}
+
+void SherlockEngine::toggleDimmedClue(const QString &key)
+{
+    if (key.isEmpty() || key.size() > 192)
+        return;
+
+    if (m_dimmedClueKeys.contains(key))
+        m_dimmedClueKeys.remove(key);
+    else
+        m_dimmedClueKeys.insert(key);
+
+    emit dimmedCluesChanged();
+    saveState();
+}
+
+void SherlockEngine::clearDimmedClues()
+{
+    if (m_dimmedClueKeys.isEmpty())
+        return;
+    m_dimmedClueKeys.clear();
+    emit dimmedCluesChanged();
 }
 
 bool SherlockEngine::ensureBankLoaded(int size)
@@ -613,6 +664,7 @@ void SherlockEngine::startPuzzleCommon(bool clearProgress)
 {
     clearConflicts();
     clearHint();
+    clearDimmedClues();
     setLastTouched(-1, -1);
 
     // Fresh solution must already be in m_solution
@@ -735,7 +787,7 @@ void SherlockEngine::startRandomPuzzle()
     generateSolutionFromSeed(m_puzzleSeed);
     startPuzzleCommon(true);
     timerReset();
-    emit message(QStringLiteral("Random puzzle started."));
+    emit message(tr("Random puzzle started."));
 }
 
 void SherlockEngine::startBankPuzzle(int puzzleId)
@@ -764,7 +816,7 @@ void SherlockEngine::startBankPuzzle(int puzzleId)
     startPuzzleCommon(/*clearProgress*/ true);
     timerReset();
 
-    emit message(QStringLiteral("Bank puzzle #%1 started.").arg(m_puzzleId));
+    emit message(tr("Bank puzzle #%1 started.").arg(m_puzzleId + 1));
 }
 
 int SherlockEngine::bankCount()
@@ -835,7 +887,7 @@ void SherlockEngine::restartCurrentPuzzle()
         generateSolutionFromSeed(m_puzzleSeed);
         startPuzzleCommon(true);
         timerReset();
-        emit message(QStringLiteral("Puzzle restarted."));
+        emit message(tr("Puzzle restarted."));
     }
 }
 
@@ -863,7 +915,7 @@ void SherlockEngine::setSize(int n)
     emit sizeChanged();
     emit boardChanged();   // board dimensions changed, QML should re-render
     loadSolvedBankFromDisk(m_size);
-    emit message(QStringLiteral("Board size set to %1x%1.").arg(m_size));
+    emit message(tr("Board size set to %1×%1.").arg(m_size));
 }
 
 void SherlockEngine::resetCell(int row, int col)
@@ -910,6 +962,113 @@ void SherlockEngine::setIconSource(int v)
     saveState();
 }
 
+void SherlockEngine::setIconTheme(const QString &theme)
+{
+    const QString selected = resolveIconTheme(theme);
+    if (selected.isEmpty())
+        return;
+
+    const bool themeWasChanged = (m_iconTheme != selected);
+    const bool sourceChanged = (m_iconSource != Generated);
+    if (!themeWasChanged && !sourceChanged)
+        return;
+
+    m_iconTheme = selected;
+    m_iconSource = Generated;
+    ++m_iconEpoch;
+
+    if (themeWasChanged)
+        emit iconThemeChanged();
+    if (sourceChanged)
+        emit iconSourceChanged();
+    emit imagesChanged();
+    saveState();
+}
+
+void SherlockEngine::setIconThemeRoot(const QString &path)
+{
+    m_iconThemeRoot = path.trimmed().isEmpty()
+                    ? QString() : QDir::cleanPath(path);
+    refreshIconThemes();
+}
+
+bool SherlockEngine::isValidIconTheme(const QString &themeName) const
+{
+    if (m_iconThemeRoot.isEmpty() || themeName.isEmpty())
+        return false;
+
+    const QDir themeDir(QDir(m_iconThemeRoot).filePath(themeName));
+    if (!themeDir.exists(QStringLiteral("theme_preview.png")))
+        return false;
+
+    const QDir iconDir(themeDir.filePath(QStringLiteral("icons_32x32")));
+    if (!iconDir.exists(QStringLiteral("00_blank.png")))
+        return false;
+
+    int index = 1;
+    for (int row = 0; row < 6; ++row) {
+        const QChar rowLetter = QStringLiteral("ABCDEF").at(row);
+        for (int item = 0; item < 6; ++item, ++index) {
+            const QString fileName = QStringLiteral("%1_%2%3.png")
+                .arg(index, 2, 10, QLatin1Char('0'))
+                .arg(rowLetter)
+                .arg(item + 1);
+            if (!iconDir.exists(fileName))
+                return false;
+        }
+    }
+
+    return true;
+}
+
+QString SherlockEngine::resolveIconTheme(const QString &themeName) const
+{
+    const QString requested = themeName.trimmed();
+    for (const QString &available : m_availableIconThemes) {
+        if (available == requested)
+            return available;
+    }
+    for (const QString &available : m_availableIconThemes) {
+        if (available.compare(requested, Qt::CaseInsensitive) == 0)
+            return available;
+    }
+    return QString();
+}
+
+void SherlockEngine::refreshIconThemes()
+{
+    QStringList discovered;
+    if (!m_iconThemeRoot.isEmpty()) {
+        const QDir root(m_iconThemeRoot);
+        const QStringList directories = root.entryList(
+            QDir::Dirs | QDir::NoDotAndDotDot,
+            QDir::Name | QDir::IgnoreCase);
+        for (const QString &directory : directories) {
+            if (isValidIconTheme(directory))
+                discovered.append(directory);
+        }
+    }
+
+    const bool catalogChanged = (m_availableIconThemes != discovered);
+    m_availableIconThemes = discovered;
+
+    QString selected = resolveIconTheme(m_iconTheme);
+    if (selected.isEmpty() && !m_availableIconThemes.isEmpty())
+        selected = m_availableIconThemes.first();
+
+    const bool themeWasChanged = (m_iconTheme != selected);
+    m_iconTheme = selected;
+
+    if (catalogChanged)
+        emit iconThemesChanged();
+    if (themeWasChanged) {
+        ++m_iconEpoch;
+        emit iconThemeChanged();
+        emit imagesChanged();
+        saveState();
+    }
+}
+
 void SherlockEngine::rebuildForSize()
 {
     const int cells = m_size * m_size;
@@ -934,7 +1093,7 @@ QString SherlockEngine::dataDir() const
 
 void SherlockEngine::loadState()
 {
-    QSettings s;
+    QSettings s(appSettingsPath(), QSettings::NativeFormat);
 
     // 1) Size
     const int sz = s.value(QStringLiteral("size"), 6).toInt();
@@ -976,9 +1135,29 @@ void SherlockEngine::loadState()
     const IconSource loadedSource = (src == int(Shi)) ? Shi : Generated;
     m_iconSource = loadedSource;
 
+    // The installed theme catalog is scanned after construction. Keep the
+    // saved directory name here so it can be resolved case-insensitively once
+    // the application supplies the asset root.
+    m_iconTheme = s.value(QStringLiteral("iconTheme")).toString().trimmed();
+
     // Autocomplete
     m_autoCompleteEnabled = s.value(QStringLiteral("autoCompleteEnabled"), false).toBool();
     emit autoCompleteEnabledChanged();
+
+    const int savedDifficulty =
+        s.value(QStringLiteral("difficulty"), int(Medium)).toInt();
+    m_difficulty = (savedDifficulty >= int(Easy) && savedDifficulty <= int(Hard))
+                 ? savedDifficulty : int(Medium);
+    emit difficultyChanged();
+
+    const QStringList savedDimmedClues =
+        s.value(QStringLiteral("dimmedClueKeys")).toStringList();
+    m_dimmedClueKeys.clear();
+    for (const QString &key : savedDimmedClues) {
+        if (!key.isEmpty() && key.size() <= 192)
+            m_dimmedClueKeys.insert(key);
+    }
+    emit dimmedCluesChanged();
 
     // 3) Masks
     const QVariantList savedMasks = s.value(QStringLiteral("masks")).toList();
@@ -1040,6 +1219,7 @@ void SherlockEngine::loadState()
 
     rebuildClues();
     emit iconSourceChanged();
+    emit iconThemeChanged();
     updateSolvedState(false);
     emit puzzleIdentityChanged();
     ++m_iconEpoch;
@@ -1062,10 +1242,13 @@ void SherlockEngine::loadState()
 
 void SherlockEngine::saveState() const
 {
-    QSettings s;
+    QSettings s(appSettingsPath(), QSettings::NativeFormat);
     s.setValue(QStringLiteral("size"), m_size);
     s.setValue(QStringLiteral("iconSource"), int(m_iconSource));
+    s.setValue(QStringLiteral("iconTheme"), m_iconTheme);
     s.setValue(QStringLiteral("autoCompleteEnabled"), m_autoCompleteEnabled);
+    s.setValue(QStringLiteral("difficulty"), m_difficulty);
+    s.setValue(QStringLiteral("dimmedClueKeys"), dimmedClueKeys());
     s.setValue(QStringLiteral("puzzleSource"), int(m_puzzleSource));
     s.setValue(QStringLiteral("puzzleId"), m_puzzleId);
     s.setValue(QStringLiteral("puzzleSeed"), uint(m_puzzleSeed));
@@ -1152,132 +1335,16 @@ static inline int maskToItem(quint32 m)
     return -1;
 }
 
-int SherlockEngine::ambiguousCellCount() const
+bool SherlockEngine::applyForcedRowCompletion()
 {
-    const int cells = m_size * m_size;
-    int amb = 0;
-    for (int i = 0; i < cells; ++i) {
-        const quint32 m = m_masks[i];
-        if (m == 0) return cells; // treat as non-trivial
-        if ((m & (m - 1)) != 0) ++amb; // not a singleton
-    }
-    return amb;
-}
-
-bool SherlockEngine::applyHiddenSinglesPass(bool &anyChange)
-{
-    anyChange = false;
-    const int n = m_size;
-    const quint32 fm = fullMask();
-    bool changed = false;
-
-    // Sherlock rule: uniqueness is ROW-only.
-    // Hidden single in a row: an item can only fit in one column of that row.
-
-    for (int r = 0; r < n; ++r) {
-        for (int item = 0; item < n; ++item) {
-            const quint32 b = bit(item);
-            int whereC = -1;
-            int count = 0;
-
-            for (int c = 0; c < n; ++c) {
-                const int i = r * n + c;
-                const quint32 m = (m_masks[i] & fm);
-                if (m & b) {
-                    whereC = c;
-                    if (++count > 1) break;
-                }
-            }
-
-            if (count == 1 && whereC >= 0) {
-                const int i = r * n + whereC;
-                if (m_masks[i] != b) {
-                    m_masks[i] = b;
-                    // Propagate row-only constraint immediately
-                    propagateCertain(r, whereC, item);
-                    changed = true;
-                }
-            }
-        }
-    }
-
-    anyChange = changed;
-    return true;
-}
-
-bool SherlockEngine::tryAutoCompleteTrivialFinish()
-{
-    const int amb = ambiguousCellCount();
-    if (amb == 0) return false;
-//    if (amb > m_size) return false; // Conservative/trivial gate (tweak later: amb > 2*m_size is looser
-
-    // More permissive, still conservative: allow up to 3*n ambiguous cells.
-    if (amb > 3 * m_size) return false;
-
     m_inAutoComplete = true;
 
-    // One undo step for the whole auto-finish.
-    pushUndoSnapshot();
-    clearRedo();
-    clearConflicts();
-    clearHint();
-
-    bool anyOverallChange = false;
-
-    auto propagateAllCurrentSingles = [&]() -> bool {
-        const int n = m_size;
-        const quint32 fm = fullMask();
-        bool any = false;
-
-        for (int r = 0; r < n; ++r) {
-            for (int c = 0; c < n; ++c) {
-                const int i = r * n + c;
-                const quint32 m = (m_masks[i] & fm);
-                if (m != 0 && ((m & (m - 1)) == 0)) {
-                    // singleton => propagate row-only
-                    const int item = maskToItem(m);
-                    if (item >= 0 && item < n) {
-                        // propagateCertain only reduces peers; mark change if it actually changes something
-                        // We'll detect change by checking peers before/after.
-                        const QVector<quint32> beforeRow = [&]{
-                            QVector<quint32> v(n);
-                            for (int cc = 0; cc < n; ++cc) v[cc] = m_masks[r*n + cc] & fm;
-                            return v;
-                        }();
-
-                        propagateCertain(r, c, item);
-
-                        for (int cc = 0; cc < n; ++cc) {
-                            if ((m_masks[r*n + cc] & fm) != beforeRow[cc]) { any = true; break; }
-                        }
-                    }
-                }
-            }
-        }
-        return any;
-    };
-
-    // Repeat forced-only passes until stable.
-    // Bound iterations to avoid pathological loops.
-    for (int it = 0; it < m_size * m_size; ++it) {
-        bool passChanged = false;
-
-        // First, propagate existing singletons
-        if (propagateAllCurrentSingles()) passChanged = true;
-
-        // Then, create new singletons via hidden singles and propagate them
-        bool hiddenChanged = false;
-        applyHiddenSinglesPass(hiddenChanged);
-        if (hiddenChanged) passChanged = true;
-
-        if (!passChanged) break;
-        anyOverallChange = true;
-    }
-
-    if (anyOverallChange) {
-        emit boardChanged();
-        saveState();
-    }
+    std::vector<std::uint32_t> masks(m_masks.cbegin(), m_masks.cend());
+    const std::vector<std::uint8_t> fixed(m_fixed.cbegin(), m_fixed.cend());
+    const bool anyOverallChange = SherlockCandidates::closeForcedRows(
+        m_size, masks, fixed);
+    if (anyOverallChange)
+        std::copy(masks.cbegin(), masks.cend(), m_masks.begin());
 
     m_inAutoComplete = false;
     return anyOverallChange;
@@ -1285,45 +1352,17 @@ bool SherlockEngine::tryAutoCompleteTrivialFinish()
 
 bool SherlockEngine::isSolvedNow() const
 {
-    const int n = m_size;
-    const int cells = n * n;
+    const int cells = m_size * m_size;
+    if (m_solution.size() != cells)
+        return false;
 
-    // All cells must be certain (single-bit)
+    // Rows are independent icon categories. A solved board must match the
+    // hidden solution exactly; equal numeric item indexes in different rows
+    // are not column duplicates.
     for (int i = 0; i < cells; ++i) {
-        const quint32 m = m_masks[i];
-        if (m == 0 || (m & (m - 1)) != 0) return false;
+        if (m_masks[i] != bit(m_solution[i]))
+            return false;
     }
-
-    // No duplicates in any row/column
-    auto maskToItemLocal = [](quint32 m) -> int {
-        for (int k = 0; k < 32; ++k) if (m & (1u << k)) return k;
-        return -1;
-    };
-
-    // Rows
-    for (int r = 0; r < n; ++r) {
-        QVector<int> seen(n, 0);
-        for (int c = 0; c < n; ++c) {
-            const int i = r * n + c;
-            const int item = maskToItemLocal(m_masks[i]);
-            if (item < 0 || item >= n) return false;
-            if (seen[item]) return false;
-            seen[item] = 1;
-        }
-    }
-
-    // Cols
-    for (int c = 0; c < n; ++c) {
-        QVector<int> seen(n, 0);
-        for (int r = 0; r < n; ++r) {
-            const int i = r * n + c;
-            const int item = maskToItemLocal(m_masks[i]);
-            if (item < 0 || item >= n) return false;
-            if (seen[item]) return false;
-            seen[item] = 1;
-        }
-    }
-
     return true;
 }
 
@@ -1334,17 +1373,17 @@ void SherlockEngine::updateSolvedState(bool announce)
         m_solved = nowSolved;
         emit solvedChanged();
         if (announce && m_solved) {
-            emit message(QStringLiteral("Solved!"));
+            emit message(tr("Solved!"));
             appendScoreIfSolved();
             markCurrentBankPuzzleSolved();
             timerStop();
         }
     }
 
-    // Autocomplete "trivial finish" (optional, forced-only, no guessing)
-    // Only run on announced/user-triggered updates (not on load).
+    // Autocomplete performs every forced row-only deduction after a user
+    // action. It never guesses, and no global progress threshold applies.
     if (announce && m_autoCompleteEnabled && !m_solved && !m_inAutoComplete) {
-        if (tryAutoCompleteTrivialFinish()) {
+        if (applyForcedRowCompletion()) {
             // After applying, re-check solved state and announce if solved.
             const bool solvedAfter = isSolvedNow();
             if (solvedAfter != m_solved) {
@@ -1352,7 +1391,7 @@ void SherlockEngine::updateSolvedState(bool announce)
                 emit solvedChanged();
             }
             if (m_solved) {
-                emit message(QStringLiteral("Solved!"));
+                emit message(tr("Solved!"));
                 appendScoreIfSolved();
                 markCurrentBankPuzzleSolved();
                 timerStop();
@@ -1361,19 +1400,28 @@ void SherlockEngine::updateSolvedState(bool announce)
     }
 }
 
-void SherlockEngine::setHint(int cell, int item)
+void SherlockEngine::setHint(int cell, int item, bool eliminates,
+                             const QString &clueKey)
 {
-    if (m_hintCell == cell && m_hintItem == item) return;
+    if (m_hintCell == cell && m_hintItem == item &&
+            m_hintEliminates == eliminates && m_hintClueKey == clueKey)
+        return;
     m_hintCell = cell;
     m_hintItem = item;
+    m_hintEliminates = eliminates;
+    m_hintClueKey = clueKey;
     emit hintChanged();
 }
 
 void SherlockEngine::clearHint()
 {
-    if (m_hintCell < 0 && m_hintItem < 0) return;
+    if (m_hintCell < 0 && m_hintItem < 0 && !m_hintEliminates &&
+            m_hintClueKey.isEmpty())
+        return;
     m_hintCell = -1;
     m_hintItem = -1;
+    m_hintEliminates = false;
+    m_hintClueKey.clear();
     emit hintChanged();
 }
 
@@ -1385,9 +1433,12 @@ void SherlockEngine::verify()
     QVector<int> conflicts;
     conflicts.reserve(cells);
 
-    // 1) Any zero-mask cell is an immediate contradiction (should not happen, but verify it)
+    // Any cell which no longer contains its correct icon is contradictory.
     for (int i = 0; i < cells; ++i) {
-        if (m_masks[i] == 0) conflicts.push_back(i);
+        if (i >= m_solution.size() ||
+                (m_masks[i] & bit(m_solution[i])) == 0) {
+            conflicts.push_back(i);
+        }
     }
 
     // 2) Row duplicates among certain cells
@@ -1410,32 +1461,12 @@ void SherlockEngine::verify()
         }
     }
 
-    // 3) Column duplicates among certain cells
-    for (int c = 0; c < n; ++c) {
-        QVector<int> seen(n, -1);
-        for (int r = 0; r < n; ++r) {
-            const int i = r * n + c;
-            const quint32 m = m_masks[i];
-            if (!isCertainMask(m)) continue;
-
-            const int item = maskToItem(m);
-            if (item < 0 || item >= n) continue;
-
-            if (seen[item] >= 0) {
-                conflicts.push_back(i);
-                conflicts.push_back(seen[item]);
-            } else {
-                seen[item] = i;
-            }
-        }
-    }
-
     setConflicts(conflicts);
 
     if (m_conflictCells.isEmpty()) {
-        emit message(QStringLiteral("No contradictions found."));
+        emit message(tr("No contradictions found."));
     } else {
-        emit message(QStringLiteral("Contradictions found: %1 cell(s).").arg(m_conflictCells.size()));
+        emit message(tr("Contradictions found: %1 cell(s).").arg(m_conflictCells.size()));
     }
 }
 
@@ -1444,82 +1475,83 @@ void SherlockEngine::hint()
     clearHint();
 
     if (m_solved) {
-        emit message(QStringLiteral("Already solved."));
+        emit message(tr("Already solved."));
         return;
     }
 
-    const int n = m_size;
-    const int cells = n * n;
+    std::vector<SherlockClues::Clue> clues;
+    std::vector<QString> clueKeys;
+    for (const SemClueGroup &group : m_dosClueGroups) {
+        for (const SemClue &source : group.clues) {
+            SherlockClues::Clue clue;
+            clue.type = int(source.sem.type);
+            clue.orient = source.orient;
+            clue.index = source.index;
+            clue.a = source.sem.a;
+            clue.b = source.sem.b;
+            clue.c = source.sem.c;
+            clue.aRow = source.aRow;
+            clue.aCol = source.aCol;
+            clue.bRow = source.bRow;
+            clue.bCol = source.bCol;
+            clue.cRow = source.cRow;
+            clue.cCol = source.cCol;
+            clue.xMark = source.sem.xMark;
+            clue.flags = source.sem.flags;
+            clues.push_back(clue);
 
-    // 1) Naked single: any non-fixed cell with exactly one candidate
-    for (int i = 0; i < cells; ++i) {
-        if (isFixedIndex(i)) continue;
-        const quint32 m = m_masks[i];
-        if (m != 0 && ((m & (m - 1)) == 0)) {
-            // find item
-            for (int k = 0; k < n; ++k) {
-                if (m & bit(k)) {
-                    setHint(i, k);
-                    emit message(QStringLiteral("Hint: single candidate."));
-                    return;
-                }
-            }
+            QStringList parts;
+            parts << QString::number(group.orient)
+                  << QString::number(group.index)
+                  << QString::number(int(source.sem.type))
+                  << QString::number(source.aRow)
+                  << QString::number(source.sem.a)
+                  << QString::number(source.bRow)
+                  << QString::number(source.sem.b)
+                  << QString::number(source.cRow)
+                  << QString::number(source.sem.c)
+                  << QString::number(source.sem.flags)
+                  << QString::number(source.sem.xMark);
+            clueKeys.push_back(parts.join(QLatin1Char(':')));
         }
     }
 
-    // 2) Hidden single in rows
-    for (int r = 0; r < n; ++r) {
-        for (int item = 0; item < n; ++item) {
-            int where = -1;
-            int count = 0;
-            const quint32 b = bit(item);
+    std::vector<std::uint32_t> masks;
+    masks.reserve(static_cast<std::size_t>(m_masks.size()));
+    for (quint32 mask : m_masks)
+        masks.push_back(static_cast<std::uint32_t>(mask));
+    const std::vector<std::uint8_t> fixed(m_fixed.cbegin(), m_fixed.cend());
+    const std::vector<int> solution(m_solution.cbegin(), m_solution.cend());
 
-            for (int c = 0; c < n; ++c) {
-                const int i = r * n + c;
-                if (isFixedIndex(i)) continue;
-                if (m_masks[i] & b) {
-                    where = i;
-                    if (++count > 1) break;
-                }
-            }
-            if (count == 1 && where >= 0) {
-                setHint(where, item);
-                emit message(QStringLiteral("Hint: only place in row."));
-                return;
-            }
+    const SherlockHints::Hint found = SherlockHints::find(
+        m_size, masks, fixed, solution, clues);
+    if (found.action != SherlockHints::NoAction && found.cell >= 0 &&
+            found.item >= 0) {
+        const bool eliminates = found.action == SherlockHints::Eliminate;
+        const bool hasClue = found.clueIndex >= 0 &&
+                             found.clueIndex < static_cast<int>(clueKeys.size());
+        setHint(found.cell, found.item, eliminates,
+                hasClue ? clueKeys[static_cast<std::size_t>(found.clueIndex)]
+                        : QString());
+        if (hasClue) {
+            emit message(eliminates
+                         ? tr("Hint: remove the highlighted candidate using the highlighted clue.")
+                         : tr("Hint: make the highlighted candidate certain using the highlighted clue."));
+        } else {
+            emit message(eliminates
+                         ? tr("Hint: remove the highlighted candidate using the one-of-each row rule.")
+                         : tr("Hint: make the highlighted candidate certain using the one-of-each row rule."));
         }
+        return;
     }
 
-    // 3) Hidden single in columns
-    for (int c = 0; c < n; ++c) {
-        for (int item = 0; item < n; ++item) {
-            int where = -1;
-            int count = 0;
-            const quint32 b = bit(item);
-
-            for (int r = 0; r < n; ++r) {
-                const int i = r * n + c;
-                if (isFixedIndex(i)) continue;
-                if (m_masks[i] & b) {
-                    where = i;
-                    if (++count > 1) break;
-                }
-            }
-            if (count == 1 && where >= 0) {
-                setHint(where, item);
-                emit message(QStringLiteral("Hint: only place in column."));
-                return;
-            }
-        }
-    }
-
-    emit message(QStringLiteral("No forced move found."));
+    emit message(tr("No hint is needed."));
 }
 
 void SherlockEngine::applyHint()
 {
     if (!hasHint()) {
-        emit message(QStringLiteral("No hint to apply."));
+        emit message(tr("No hint to apply."));
         return;
     }
 
@@ -1527,12 +1559,23 @@ void SherlockEngine::applyHint()
     const int i = m_hintCell;
     const int row = i / n;
     const int col = i % n;
+    const int item = m_hintItem;
+    const bool eliminates = m_hintEliminates;
 
-    // Apply as a certain move (includes propagation + undo step in your current implementation)
-    setCertain(row, col, m_hintItem);
+    // A stale hint must never invoke setCertain's deliberate tap-again reset.
+    // Clear it and find the next deduction instead.
+    const quint32 candidate = bit(item);
+    if ((eliminates && (m_masks[i] & candidate) == 0) ||
+            (!eliminates && m_masks[i] == candidate)) {
+        clearHint();
+        hint();
+        return;
+    }
 
-    // Clear hint after applying
-    clearHint();
+    if (eliminates)
+        eliminateCandidate(row, col, item);
+    else
+        setCertain(row, col, item);
 }
 
 void SherlockEngine::pushUndoSnapshot()
@@ -1608,32 +1651,27 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
     }
 
     const int cells = m_size * m_size;
-    if (s.masks.size() != cells || s.fixed.size() != cells) {
+    if (s.masks.size() != cells || s.fixed.size() != cells ||
+            s.solution.size() != cells) {
         return false;
     }
 
-    // Restore authoritative state
-    // Defensive resize
+    // Undo/redo belongs to the current puzzle. Givens, solution, seed and
+    // clues are immutable puzzle identity; only candidate masks may change.
+    // Reject a stale/legacy snapshot instead of silently replacing identity
+    // and regenerating a different-looking clue model.
+    if (s.fixed != m_fixed || s.solution != m_solution)
+        return false;
+
     m_masks = s.masks;
-    m_fixed = s.fixed;
-    m_solution = s.solution;
 
     const quint32 fm = fullMask();
 
-    // Fix sizes
+    // Defensive mask normalization.
     if (m_masks.size() != cells) {
         const int old = m_masks.size();
         m_masks.resize(cells);
         for (int i = old; i < cells; ++i) m_masks[i] = fm;
-    }
-    if (m_fixed.size() != cells) {
-        const int old = m_fixed.size();
-        m_fixed.resize(cells);
-        for (int i = old; i < cells; ++i) m_fixed[i] = 0;
-    }
-    if (m_solution.size() != cells) {
-        // keep your existing logic here; don't invent new generation
-        // (if you already rebuild solution elsewhere, you can leave this alone)
     }
 
     // Clamp masks: no zeros, no bits outside fullMask
@@ -1645,8 +1683,7 @@ bool SherlockEngine::applySnapshot(const Snapshot &s, bool persist)
 
     clearHint();
 
-    // Derived data + notifications
-    rebuildClues();
+    // Clues deliberately stay untouched: Undo/Redo changes board marks only.
     updateSolvedState(false);
     emit boardChanged();
 
@@ -1742,955 +1779,50 @@ void SherlockEngine::rebuildClues()
 
 void SherlockEngine::rebuildDosClues()
 {
-    qDebug() << "[rebuildDosClues] start n=" << m_size << " diff=" << m_difficulty;
-    QElapsedTimer t;
-    t.start();
-    const qint64 TIME_BUDGET_MS = 50; // keep UI responsive
-
     m_dosClueGroups.clear();
 
-    const int n = m_size;
-    const int cells = n * n;
-    if (m_solution.size() != cells)
+    const std::vector<int> solution(m_solution.cbegin(), m_solution.cend());
+    const std::vector<std::uint8_t> fixed(m_fixed.cbegin(), m_fixed.cend());
+    const SherlockClues::Result generated = SherlockClues::generate(
+        m_size, solution, fixed, m_puzzleSeed, m_difficulty);
+
+    if (!generated.valid) {
+        emit dosClueGroupsChanged();
         return;
-
-    auto rngSeed = [&](quint32 salt) -> quint32 {
-        quint32 s = (m_puzzleSeed == 0u) ? 1u : m_puzzleSeed;
-        s ^= salt;
-        s ^= quint32(m_difficulty) * 2654435761u;
-        if (s == 0u) s = 1u;
-        return s;
-    };
-
-    auto nextRand = [&](quint32 &state) -> quint32 {
-        // LCG (deterministic)
-        state = state * 1664525u + 1013904223u;
-        return state;
-    };
-
-    auto shuffleVec = [&](QVector<int> &v, quint32 seed) {
-        quint32 st = seed;
-        for (int i = v.size() - 1; i > 0; --i) {
-            int j = int(nextRand(st) % quint32(i + 1));
-            qSwap(v[i], v[j]);
-        }
-    };
-
-    auto colOf = [&](int row, int item) -> int {
-        // In row 'row', find which column has 'item' in the solution
-        const int base = row * n;
-        for (int c = 0; c < n; ++c) {
-            if (m_solution[base + c] == item)
-                return c;
-        }
-        return -1;
-    };
-
-    auto itemAt = [&](int row, int col) -> int {
-        return m_solution[row * n + col]; // 0..n-1
-    };
-
-    // --- DOS clue helpers (place inside rebuildDosClues(), after colOf/itemAt) ---
-
-    auto semHasC = [&](const SemClue& s) -> bool {
-        return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
-    };
-
-    auto rowsDistinctRequired = [&](const SemClue& s) -> bool {
-        // For ALL of our DOS clue types, A and B must come from different rows.
-        if (s.aRow < 0 || s.bRow < 0) return false;
-        if (s.aRow == s.bRow) return false;
-
-        if (semHasC(s)) {
-            if (s.cRow < 0) return false;
-            // For 3-icon variants in our supported DOS set, C is always a third row too.
-            // (This also prevents illegal "two items from same category" displays.)
-            if (s.cRow == s.aRow) return false;
-            if (s.cRow == s.bRow) return false;
-        }
-        return true;
-    };
-
-    auto recalcColsFromSolution = [&](SemClue& s) {
-        s.aCol = colOf(s.aRow, s.sem.a);
-        s.bCol = colOf(s.bRow, s.sem.b);
-        if (semHasC(s)) s.cCol = colOf(s.cRow, s.sem.c);
-        else s.cCol = -1;
-    };
-
-    auto clueHoldsInSolution = [&](const SemClue& s) -> bool {
-        const int ca = colOf(s.aRow, s.sem.a);
-        const int cb = colOf(s.bRow, s.sem.b);
-        if (ca < 0 || cb < 0) return false;
-
-        const bool hasC = semHasC(s);
-        const int cc = hasC ? colOf(s.cRow, s.sem.c) : -1;
-        if (hasC && cc < 0) return false;
-
-        switch (s.sem.type) {
-        case ClueType::SameColumn:
-            if (ca != cb) return false;
-            if (hasC && ca != cc) return false;
-            return true;
-
-        case ClueType::NotSameColumn:
-            if (!hasC) {
-                return (ca != cb);
-            } else {
-                // Rule 2 (3 icons): A and B are in same column, boxed item (C) is NOT in that column.
-            if (ca != cb) return false;
-                return (cc != ca);
-            }
-
-        case ClueType::SameColumnXor:
-            // Rule 3: A is in same column as either B or C but NOT BOTH.
-            if (!hasC) return false; // XOR is always 3-icon
-            return ((ca == cb) ^ (ca == cc));
-
-        case ClueType::LeftOf:
-            // Rule 4: A is left of B
-            return (ca < cb);
-
-        case ClueType::NextTo:
-            // Rule 5:
-            // 2 icons: A next to B
-            // 3 icons: C next to B AND two columns away from A
-            if (!hasC) {
-                return (qAbs(ca - cb) == 1);
-            } else {
-                if (qAbs(ca - cb) != 1) return false;
-                if (qAbs(cc - cb) != 1) return false;
-                if (qAbs(cc - ca) != 2) return false;
-                return true;
-            }
-
-        case ClueType::NotNextTo:
-            // Rule 6:
-            // 2 icons: A NOT next to B
-            // 3 icons: A and C have exactly one column between them, B is NOT in that between-column
-            if (!hasC) {
-                return (qAbs(ca - cb) != 1);
-            } else {
-                if (qAbs(ca - cc) != 2) return false;
-                const int between = (ca + cc) / 2; // safe because diff is 2
-                return (cb != between);
-            }
-
-        default:
-            return false;
-        }
-
-    };
-
-    QSet<QString> emitted; // across all groups for this rebuild
-
-    auto clueSignature = [&](const SemClue &s) -> QString {
-        // Use semantic items + rows (and xMark/flags) as identity. Keep it stable.
-        // For symmetric 2-icon types (SameColumn, NotSameColumn, NextTo, NotNextTo), sort A/B by (row,item).
-        auto keyPair = [&](int r, int item) -> QString { return QString::number(r) + ":" + QString::number(item); };
-
-        const bool hasC = (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
-
-        QString A = keyPair(s.aRow, s.sem.a);
-        QString B = keyPair(s.bRow, s.sem.b);
-        QString C = hasC ? keyPair(s.cRow, s.sem.c) : QString("-");
-
-        const bool symmetricAB =
-            (s.sem.type == ClueType::SameColumn) ||
-            (s.sem.type == ClueType::NotSameColumn) ||
-            (s.sem.type == ClueType::NextTo) ||
-            (s.sem.type == ClueType::NotNextTo);
-
-        if (symmetricAB && A > B) qSwap(A, B);
-
-        // XOR is *not* symmetric: A is special. LeftOf is directional too.
-        return QString("%1|o%2|i%3|t%4|f%5|x%6|%7|%8|%9")
-            .arg(int(s.sem.given))
-            .arg(int(s.orient))
-            .arg(int(s.index))
-            .arg(int(s.sem.type))
-            .arg(int(s.sem.flags))
-            .arg(int(s.sem.xMark))
-            .arg(A).arg(B).arg(C);
-    };
-
-    // Normalize sem AND keep aRow/aCol/bRow/bCol/cRow/cCol consistent with sem.a/sem.b/sem.c.
-    auto normalizeSemClue = [&](SemClue &sc) {
-        const ClueSemantic before = sc.sem;
-        const ClueSemantic after  = normalizeClue(sc.sem);
-
-        // If no change, nothing to do.
-        if (after.type == before.type &&
-            after.a == before.a && after.b == before.b && after.c == before.c &&
-            after.flags == before.flags && after.given == before.given &&
-            after.xMark == before.xMark) {
-            return;
-        }
-
-        // Build old triplet of items and their row/col
-        struct Slot { int item; int row; int col; };
-        Slot oldSlots[3] = {
-            { before.a, sc.aRow, sc.aCol },
-            { before.b, sc.bRow, sc.bCol },
-            { before.c, sc.cRow, sc.cCol }
-        };
-
-        auto findSlot = [&](int item) -> Slot {
-            for (const auto &s : oldSlots) {
-                if (s.item == item) return s;
-            }
-            // Should never happen, but keep safe
-            return Slot{ item, -1, -1 };
-        };
-
-        // Re-attach rows/cols to match the normalized a/b/c items
-        {
-            Slot sA = findSlot(after.a);
-            Slot sB = findSlot(after.b);
-            Slot sC = findSlot(after.c);
-
-            sc.aRow = sA.row; sc.aCol = sA.col;
-            sc.bRow = sB.row; sc.bCol = sB.col;
-            sc.cRow = sC.row; sc.cCol = sC.col;
-        }
-
-        sc.sem = after;
-    };
-
-    // Prevent contradictory SameColumn duplicates ---
-    // Tracks forced column for each (row,item) implied by emitted SameColumn clues.
-    QHash<int, int> forcedSameCol; // key=(row<<8)|item  value=col
-
-    auto scKey = [&](int row, int item) -> int {
-        return (row << 8) | (item & 0xFF);
-    };
-
-    auto acceptAndRecordSameColumn = [&](const SemClue& s) -> bool {
-        if (s.sem.type != ClueType::SameColumn) return true;
-
-        // SameColumn must have aRow/bRow and a/b; optional c
-        const int col = s.aCol; // after recalcColsFromSolution(), this is the solution column
-        if (col < 0) return false;
-
-        auto checkOne = [&](int row, int item) -> bool {
-            if (row < 0 || item < 0) return true;
-            const int k = scKey(row, item);
-            auto it = forcedSameCol.find(k);
-            if (it != forcedSameCol.end()) {
-                return (*it == col); // must match previously forced column
-            }
-            forcedSameCol.insert(k, col);
-            return true;
-        };
-
-        if (!checkOne(s.aRow, s.sem.a)) return false;
-        if (!checkOne(s.bRow, s.sem.b)) return false;
-
-        // If you use semHasC(s) already, reuse it:
-        if (semHasC(s)) {
-            if (!checkOne(s.cRow, s.sem.c)) return false;
-        }
-        return true;
-    };
-
-    // Helper: does this SemClue have a C item?
-    auto hasC = [&](const SemClue& s) -> bool {
-        return (s.sem.flags & ClueSemantic::HasC) && (s.sem.c >= 0);
-    };
-
-    // Helper: which of a/b/c is marked with the red-X box in the semantic clue
-    // Prefer sem.xMark when present; fallback: if CIsXbox flag is set, treat C as the boxed one.
-    auto xIndex = [&](const SemClue& s) -> int {
-        if (s.sem.xMark >= 0) return s.sem.xMark;                 // 0=a,1=b,2=c
-        if (s.sem.flags & ClueSemantic::CIsXbox) return 2;        // C boxed
-        return -1;
-    };
-
-    // Extract fixed column for (row,item) from current givens (fixed cells).
-    // Returns -1 if that item is not fixed in that row.
-    auto fixedColForItem = [&](int row, int item) -> int {
-        if (row < 0 || row >= n || item < 0 || item >= n) return -1;
-
-        for (int col = 0; col < n; ++col) {
-            const int i = row * n + col;
-            if (i < 0 || i >= m_fixed.size() || i >= m_masks.size()) continue;
-            if (!m_fixed[i]) continue;
-
-            // fixed cell: mask should be singleton; decode which item it is
-            quint32 m = m_masks[i] & fullMask();
-            if (m == 0) continue;
-
-            int fixedItem = -1;
-            for (int k = 0; k < 32; ++k) {
-                if (m & (1u << k)) { fixedItem = k; break; }
-            }
-            if (fixedItem == item) return col;
-        }
-        return -1;
-    };
-
-    // Redundancy filter: if the clue is already fully implied by givens (fixed cells), skip it.
-    auto clueIsRedundantWithGivens = [&](const SemClue& s) -> bool {
-        const int ca = fixedColForItem(s.aRow, s.sem.a);
-        const int cb = fixedColForItem(s.bRow, s.sem.b);
-        const int cc = hasC(s) ? fixedColForItem(s.cRow, s.sem.c) : -1;
-
-        // If we don't know the columns from givens, we can't call it redundant.
-        if (ca < 0 || cb < 0) return false;
-        if (hasC(s) && cc < 0) return false;
-
-        // Evaluate using the same logic as the solution validator but with known fixed columns
-        switch (s.sem.type) {
-        case ClueType::SameColumn:
-            if (!hasC(s)) return (ca == cb);
-            return (ca == cb && ca == cc);
-
-        case ClueType::NotSameColumn:
-            if (!hasC(s)) return (ca != cb);
-            {
-                const int xi = xIndex(s);
-                if (xi == 0) return (cb == cc) && (ca != cb);
-                if (xi == 1) return (ca == cc) && (cb != ca);
-                return (ca == cb) && (cc != ca);
-            }
-
-        case ClueType::SameColumnXor:
-            if (!hasC(s)) return false;
-            return ((ca == cb) ^ (ca == cc));
-
-        case ClueType::LeftOf:
-            return (ca < cb);
-
-        case ClueType::NextTo:
-            if (!hasC(s)) return (qAbs(ca - cb) == 1);
-            return (qAbs(ca - cb) == 1) && (qAbs(cb - cc) == 1) && (qAbs(ca - cc) == 2);
-
-        case ClueType::NotNextTo:
-            if (!hasC(s)) return (qAbs(ca - cb) != 1);
-            if (qAbs(ca - cc) != 2) return false;
-            return (cb != (ca + cc) / 2);
-
-        default:
-            return false;
-        }
-    };
-
-    // --- helpers: pick distinct rows, and a simple retry loop ---
-    auto pickRowExcluding = [&](quint32 &st, int ex0, int ex1, int ex2) -> int {
-        // tries up to 32 times (more than enough for n<=6)
-        for (int tries = 0; tries < 32; ++tries) {
-            int r = int(nextRand(st) % quint32(n));
-            if (r != ex0 && r != ex1 && r != ex2) return r;
-        }
-        // fallback: first allowed
-        for (int r = 0; r < n; ++r) {
-            if (r != ex0 && r != ex1 && r != ex2) return r;
-        }
-        return 0;
-    };
-
-    auto pickDistinctRows2 = [&](quint32 &st, int &r0, int &r1) {
-        r0 = int(nextRand(st) % quint32(n));
-        r1 = pickRowExcluding(st, r0, -1, -1);
-    };
-
-    auto pickDistinctRows3 = [&](quint32 &st, int &r0, int &r1, int &r2) {
-        r0 = int(nextRand(st) % quint32(n));
-        r1 = pickRowExcluding(st, r0, -1, -1);
-        r2 = pickRowExcluding(st, r0, r1, -1);
-    };
-
-    auto fixedAt = [&](int row, int col) -> bool {
-        const int idx = row * n + col;
-        return (idx >= 0 && idx < m_fixed.size() && m_fixed[idx] != 0);
-    };
-
-    // For redundancy checks: if a row has a fixed value at a given column,
-    // return the item, else -1.
-    auto fixedItemAt = [&](int row, int col) -> int {
-        const int idx = row * n + col;
-        if (idx < 0 || idx >= m_fixed.size() || idx >= m_masks.size()) return -1;
-        if (m_fixed[idx] == 0) return -1;
-        // m_solution is authoritative, but if you prefer: decode from mask here
-        if (idx >= 0 && idx < m_solution.size()) return m_solution[idx];
-        return -1;
-    };
-
-    // Core: check semantics against solution
-    auto clueHolds = [&](const SemClue &s) -> bool {
-        const bool hasC = (s.sem.flags & ClueSemantic::HasC);
-        const bool isVerticalFamily =
-                (s.sem.type == ClueType::SameColumn) ||
-                (s.sem.type == ClueType::NotSameColumn) ||
-                (s.sem.type == ClueType::SameColumnXor);
-
-        if (isVerticalFamily) {
-            if (s.aRow < 0 || s.bRow < 0) return false;
-            if (s.aRow == s.bRow) return false;
-            if (hasC) {
-                if (s.cRow < 0) return false;
-                if (s.cRow == s.aRow || s.cRow == s.bRow) return false;
-            }
-        }
-
-        auto colA = [&]() -> int { return colOf(s.aRow, s.sem.a); };
-        auto colB = [&]() -> int { return colOf(s.bRow, s.sem.b); };
-        auto colC = [&]() -> int { return colOf(s.cRow, s.sem.c); };
-
-        switch (s.sem.type) {
-        case ClueType::SameColumn:        // rule 1
-            return (colA() >= 0 && colA() == colB());
-
-        case ClueType::NotSameColumn:     // rule 2 (2 or 3 icons)
-            if (s.sem.flags & ClueSemantic::HasC) {
-                // A and B same column, C NOT in that column
-                return (colA() >= 0 && colA() == colB() && colC() >= 0 && colC() != colA());
-            } else {
-                return (colA() >= 0 && colB() >= 0 && colA() != colB());
-            }
-
-        case ClueType::SameColumnXor:     // rule 3
-            // A is in same column as exactly ONE of (B,C)
-            {
-                int a = colA(), b = colB(), c = colC();
-                if (a < 0 || b < 0 || c < 0) return false;
-                bool ab = (a == b);
-                bool ac = (a == c);
-                return (ab != ac);
-            }
-
-        case ClueType::LeftOf:            // rule 4
-            // A left of B (distance unknown)
-            {
-                int a = colA(), b = colB();
-                if (a < 0 || b < 0) return false;
-                return a < b;
-            }
-
-        case ClueType::NextTo:            // rule 5 (2 or 3 icons)
-            {
-                int a = colA(), b = colB();
-                if (a < 0 || b < 0) return false;
-                if (!(std::abs(a - b) == 1)) return false;
-                if (s.sem.flags & ClueSemantic::HasC) {
-                    int c = colC();
-                    if (c < 0) return false;
-                    // C is next to B and two away from A (i.e. A-B-C in a line)
-                    return (std::abs(b - c) == 1) && (std::abs(a - c) == 2);
-                }
-                return true;
-            }
-
-        case ClueType::NotNextTo:         // rule 6 (2 or 3 icons)
-            {
-                int a = colA(), b = colB();
-                if (a < 0 || b < 0) return false;
-
-                if (s.sem.flags & ClueSemantic::HasC) {
-                    // A and C have exactly one column between them,
-                    // and B is NOT in that middle column.
-                    int c = colC();
-                    if (c < 0) return false;
-                    if (std::abs(a - c) != 2) return false;
-                    int mid = (a + c) / 2;
-                    return b != mid;
-                } else {
-                    return std::abs(a - b) != 1;
-                }
-            }
-
-        default:
-            return true; // unknown types: don't block here
-        }
-    };
-
-    // --- Difficulty knobs (tune later) ---
-    auto vCluesPerStrip = [&]() -> int {
-        if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
-        if (m_difficulty == int(Medium)) return 2;
-        return 1; // Hard
-    };
-
-    auto hCluesPerStrip = [&]() -> int {
-        if (m_difficulty == int(Easy))   return (n >= 6 ? 3 : 2);
-        if (m_difficulty == int(Medium)) return 2;
-        return 1; // Hard
-    };
-
-    const int vPer = vCluesPerStrip();
-    const int hPer = hCluesPerStrip();
-
-    // One group per "stripe" as your UI expects: n vertical + n horizontal
-    m_dosClueGroups.reserve(2 * n);
-    for (int idx = 0; idx < n; ++idx) {
-        SemClueGroup vg; vg.orient = int(Vertical);   vg.index = idx;
-        SemClueGroup hg; hg.orient = int(Horizontal); hg.index = idx;
-        m_dosClueGroups.push_back(vg);
-        m_dosClueGroups.push_back(hg);
     }
 
-    auto vGroupAt = [&](int stripe) -> SemClueGroup* {
-        for (auto &g : m_dosClueGroups)
-            if (g.orient == int(Vertical) && g.index == stripe) return &g;
-        return nullptr;
-    };
-    auto hGroupAt = [&](int stripe) -> SemClueGroup* {
-        for (auto &g : m_dosClueGroups)
-            if (g.orient == int(Horizontal) && g.index == stripe) return &g;
-        return nullptr;
-    };
+    m_dosClueGroups.reserve(int(generated.groups.size()));
+    for (const SherlockClues::Group &sourceGroup : generated.groups) {
+        SemClueGroup group;
+        group.orient = sourceGroup.orient;
+        group.index = sourceGroup.index;
+        group.clues.reserve(int(sourceGroup.clues.size()));
 
-    // ==========================================================
-    // VERTICAL CLUES (column-relations, DOS types 1..3)
-    // We build each vertical stripe from a REAL column in solution.
-    // Stripe index == column index (0..n-1)
-    // ==========================================================
-    for (int col = 0; col < n; ++col) {
-        SemClueGroup *g = vGroupAt(col);
-        if (!g) continue;
-
-        // Collect icons that are in this solution column: (row, item)
-        QVector<QPair<int,int>> inThisCol;
-        inThisCol.reserve(n);
-        for (int r = 0; r < n; ++r) {
-            inThisCol.push_back(qMakePair(r, itemAt(r, col)));
+        for (const SherlockClues::Clue &source : sourceGroup.clues) {
+            SemClue clue;
+            clue.orient = source.orient;
+            clue.index = source.index;
+            clue.sem.type = static_cast<ClueType>(source.type);
+            clue.sem.a = source.a;
+            clue.sem.b = source.b;
+            clue.sem.c = source.c;
+            clue.sem.xMark = source.xMark;
+            clue.sem.flags = source.flags;
+            clue.sem.given = true;
+            clue.aRow = source.aRow;
+            clue.bRow = source.bRow;
+            clue.cRow = source.cRow;
+            clue.aCol = source.aCol;
+            clue.bCol = source.bCol;
+            clue.cCol = source.cCol;
+            group.clues.push_back(clue);
         }
-
-        // Deterministic shuffle for variety
-        {
-            QVector<int> order;
-            order.reserve(inThisCol.size());
-            for (int i = 0; i < inThisCol.size(); ++i) order.push_back(i);
-            shuffleVec(order, rngSeed(0x11110000u + quint32(col)));
-
-            QVector<QPair<int,int>> tmp;
-            tmp.reserve(inThisCol.size());
-            for (int k : order) tmp.push_back(inThisCol[k]);
-            inThisCol = tmp;
-        }
-
-        int made = 0;
-        quint32 st = rngSeed(0x22220000u + quint32(col));
-
-        int attempts = 0;
-        const int maxAttempts = 2000; // bump as needed; cheap, this is small n
-
-        while (made < vPer && attempts < maxAttempts) {
-            ++attempts;
-            const int pick = int(nextRand(st) % 3u); // 0..2 choose type family
-
-            if (pick == 0) {
-                // (1) Same Column: 2 or 3 images all in same column
-                // Easy: prefer 2; Medium/Hard: sometimes 3
-                const bool want3 = (m_difficulty != int(Easy)) && ((nextRand(st) & 1u) == 0u);
-
-                SemClue sc;
-                sc.orient = int(Vertical);
-                sc.index  = col;
-                sc.sem.given = true;
-
-                sc.sem.type = ClueType::SameColumn;
-
-                // a and b always
-                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
-                sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
-
-                // optional c
-                if (want3 && inThisCol.size() >= 3) {
-                    sc.cRow = inThisCol[2].first; sc.cCol = col; sc.sem.c = inThisCol[2].second;
-                    sc.sem.flags = 1; // HAS_C
-                } else {
-                    sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
-                    sc.sem.flags = 0;
-                }
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                if (!acceptAndRecordSameColumn(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-
-            if (pick == 1) {
-                // (2) Not In Same Column:
-                // 2 icons: not same column
-                // or 3 icons: two are same column, third (X-box) is NOT in that column.
-                const bool want3 = (m_difficulty != int(Easy)) && ((nextRand(st) & 1u) == 0u);
-
-                SemClue sc;
-                sc.orient = int(Vertical);
-                sc.index  = col;
-                sc.sem.given = true;
-                sc.sem.type = ClueType::NotSameColumn;
-
-                // choose (a,b) from this column (so they ARE same column)
-                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
-
-                if (!want3) {
-                    // 2 icons: A and B are NOT in the same column.
-                    // IMPORTANT: For DOS-style vertical clues, A and B must be from DIFFERENT rows/categories.
-                    // Pick A from (aRow, col) and B from (bRow != aRow, bCol != col).
-
-                    const int aRow = inThisCol[0].first;
-                    const int bRow = inThisCol[1].first; // different row
-
-                    int bCol = int(nextRand(st) % quint32(n));
-                    if (bCol == col) bCol = (bCol + 1) % n; // ensure different column than A's column
-
-                    SemClue sc;
-                    sc.orient = int(Vertical);
-                    sc.index = col;
-                    sc.sem.type = ClueType::NotSameColumn;
-                    sc.sem.given = true;
-
-                    // A in this column
-                    sc.aRow = aRow;
-                    sc.aCol = col;
-                    sc.sem.a = itemAt(aRow, col);
-
-                    // B in a different row AND different column
-                    sc.bRow = bRow;
-                    sc.bCol = bCol;
-                    sc.sem.b = itemAt(bRow, bCol);
-
-                    sc.cRow = -1;
-                    sc.cCol = -1;
-                    sc.sem.c = -1;
-                    sc.sem.flags = 0;
-
-                    // Normalize / sanity / validate / dedupe BEFORE emitting
-                    normalizeSemClue(sc);
-                    recalcColsFromSolution(sc);
-
-                    if (!rowsDistinctRequired(sc)) {
-                        continue;
-                    }
-                    if (!clueHoldsInSolution(sc)) {
-                        continue;
-                    }
-
-                    const QString sig = clueSignature(sc);
-                    if (emitted.contains(sig)) continue;
-                    emitted.insert(sig);
-
-                    if (t.elapsed() > TIME_BUDGET_MS) {
-                        break; // stop generating more clues this pass
-                    }
-                    g->clues.push_back(sc);
-                    ++made;
-                    continue;
-                } else {
-                    // b is also in same column (col)
-                    sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
-
-                    // c is the "red-X boxed" one: must NOT be in this column
-                    int r = inThisCol[2].first; // any row
-                    int otherCol = int(nextRand(st) % quint32(n));
-                    if (otherCol == col) otherCol = (otherCol + 1) % n;
-
-                    sc.cRow = r; sc.cCol = otherCol; sc.sem.c = itemAt(r, otherCol);
-
-                    // flags: HAS_C + C_IS_XBOX
-                    sc.sem.flags = 1 | 2;
-                }
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-
-            {
-                // (3) Same Column As This OR This (XOR):
-                // a shares column with exactly one of b/c.
-                SemClue sc;
-                sc.orient = int(Vertical);
-                sc.index  = col;
-                sc.sem.given = true;
-                sc.sem.type = ClueType::SameColumnXor;
-
-                // a comes from this column
-                sc.aRow = inThisCol[0].first; sc.aCol = col; sc.sem.a = inThisCol[0].second;
-
-                // b is in SAME column (col)
-                sc.bRow = inThisCol[1].first; sc.bCol = col; sc.sem.b = inThisCol[1].second;
-
-                // c is NOT in this column (col)
-                int r = inThisCol[2].first;
-                int otherCol = int(nextRand(st) % quint32(n));
-                if (otherCol == col) otherCol = (otherCol + 1) % n;
-
-                sc.cRow = r; sc.cCol = otherCol; sc.sem.c = itemAt(r, otherCol);
-
-                // flags: HAS_C
-                sc.sem.flags = 1;
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-        }
-    }
-
-    // ==========================================================
-    // HORIZONTAL CLUES (DOS types 4..6)
-    // Stripe index == row index (0..n-1)
-    // ==========================================================
-    for (int row = 0; row < n; ++row) {
-        SemClueGroup *g = hGroupAt(row);
-        if (!g) continue;
-
-        // deterministic per row
-        quint32 st = rngSeed(0x33330000u + quint32(row));
-
-        int made = 0;
-        int attempts = 0;
-        const int maxAttempts = 4000; // safe cap, prevents hang
-
-        while (made < hPer && attempts < maxAttempts) {
-            ++attempts;
-
-            // hard time budget guard (also prevents long stalls)
-            if (t.elapsed() > TIME_BUDGET_MS) break;
-            const int pick = int(nextRand(st) % 3u); // 0..2
-
-            if (pick == 0) {
-                // (4) Is Left Of (unknown distance): pick two different columns
-                int c1 = int(nextRand(st) % quint32(n));
-                int c2 = int(nextRand(st) % quint32(n));
-                if (c1 == c2) c2 = (c2 + 1) % n;
-                if (c1 > c2) qSwap(c1, c2);
-
-                SemClue sc;
-                sc.orient = int(Horizontal);
-                sc.index  = row;
-                sc.sem.type = ClueType::LeftOf;
-                sc.sem.given = true;
-
-                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
-                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
-
-                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
-                sc.sem.flags = 0;
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-
-            if (pick == 1) {
-                // (5) Is Next To: adjacent columns
-                int c1 = int(nextRand(st) % quint32(n - 1));
-                int c2 = c1 + 1;
-
-                SemClue sc;
-                sc.orient = int(Horizontal);
-                sc.index  = row;
-                sc.sem.type = ClueType::NextTo;
-                sc.sem.given = true;
-
-                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
-                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
-
-                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
-                sc.sem.flags = 0;
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-
-            {
-                // (6) Is Not Next To: pick columns with distance >= 2
-                int c1 = int(nextRand(st) % quint32(n));
-                int c2 = int(nextRand(st) % quint32(n));
-                if (c1 == c2) c2 = (c2 + 2) % n;
-
-                // ensure not adjacent
-                if (qAbs(c1 - c2) == 1) {
-                    c2 = (c2 + 2) % n;
-                }
-                if (c1 > c2) qSwap(c1, c2);
-
-                SemClue sc;
-                sc.orient = int(Horizontal);
-                sc.index  = row;
-                sc.sem.type = ClueType::NotNextTo;
-                sc.sem.given = true;
-
-                sc.aRow = row; sc.aCol = c1; sc.sem.a = itemAt(row, c1);
-                sc.bRow = row; sc.bCol = c2; sc.sem.b = itemAt(row, c2);
-
-                sc.cRow = -1; sc.cCol = -1; sc.sem.c = -1;
-                sc.sem.flags = 0;
-
-                // Normalize / sanity / validate / dedupe BEFORE emitting
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (!rowsDistinctRequired(sc)) {
-                    continue;
-                }
-                if (!clueHoldsInSolution(sc)) {
-                    continue;
-                }
-
-                const QString sig = clueSignature(sc);
-                if (emitted.contains(sig)) continue;
-                emitted.insert(sig);
-
-                if (t.elapsed() > TIME_BUDGET_MS) {
-                    break; // stop generating more clues this pass
-                }
-                g->clues.push_back(sc);
-                ++made;
-                continue;
-            }
-        }
-        if (made == 0) {
-            // Force at least one simple LeftOf clue per row if possible
-            for (int col = 0; col < n-1; ++col) {
-                SemClue sc;
-                sc.orient = 1;
-                sc.index = row;
-                sc.sem.type = ClueType::LeftOf;
-                sc.sem.given = true;
-
-                sc.aRow = row;
-                sc.aCol = col;
-                sc.sem.a = itemAt(row, col);
-
-                sc.bRow = row;
-                sc.bCol = col + 1;
-                sc.sem.b = itemAt(row, col + 1);
-
-                normalizeSemClue(sc);
-                recalcColsFromSolution(sc);
-
-                if (clueHoldsInSolution(sc)) {
-                    g->clues.push_back(sc);
-                    break;
-                }
-            }
-        }
+        m_dosClueGroups.push_back(group);
     }
 
     emit dosClueGroupsChanged();
-    // --- DEBUG: verify what we actually produced ---
-    int vGroups = 0, hGroups = 0, vClues = 0, hClues = 0;
-    for (const auto &g : m_dosClueGroups) {
-        if (g.orient == 0) { ++vGroups; vClues += g.clues.size(); }
-        else if (g.orient == 1) { ++hGroups; hClues += g.clues.size(); }
-        else { qDebug() << "[rebuildDosClues] WARNING: unknown orient" << g.orient; }
-    }
-    qDebug() << "[rebuildDosClues] summary:"
-             << "vGroups=" << vGroups << "vClues=" << vClues
-             << "hGroups=" << hGroups << "hClues=" << hClues;
+    return;
 
-    // Optional: show first few horizontal clues if any
-    for (const auto &g : m_dosClueGroups) {
-        if (g.orient != 1) continue;
-        qDebug() << "[rebuildDosClues] horiz row" << g.index << "clues=" << g.clues.size();
-        for (int i = 0; i < g.clues.size() && i < 3; ++i) {
-            const auto &c = g.clues[i];
-            qDebug() << "  type=" << int(c.sem.type)
-                     << "aRow=" << c.aRow << "a=" << c.sem.a
-                     << "bRow=" << c.bRow << "b=" << c.sem.b
-                     << "flags=" << c.sem.flags;
-        }
-    }
-    qDebug() << "[rebuildDosClues] done groups=" << m_dosClueGroups.size();
 }
 
 bool SherlockEngine::fixedAt(int row, int col) const
@@ -2799,7 +1931,7 @@ void SherlockEngine::revealSolution()
     const int cells = n * n;
 
     if (m_solution.size() != cells) {
-        emit message(QStringLiteral("No solution available to reveal."));
+        emit message(tr("No solution available to reveal."));
         return;
     }
 
@@ -2823,7 +1955,7 @@ void SherlockEngine::revealSolution()
     updateSolvedState(true);
     emit boardChanged();
     saveState();
-    emit message(QStringLiteral("Solution revealed (debug)."));
+    emit message(tr("Solution revealed (debug)."));
 }
 
 void SherlockEngine::resetMarks()
@@ -3039,7 +2171,7 @@ bool SherlockEngine::importSherlockShi(const QString &sourcePath)
 {
     QFileInfo fi(sourcePath);
     if (!fi.exists() || !fi.isFile()) {
-        emit message(QStringLiteral("Import failed: source file not found."));
+        emit message(tr("Import failed: source file not found."));
         return false;
     }
 
@@ -3049,7 +2181,7 @@ bool SherlockEngine::importSherlockShi(const QString &sourcePath)
         QFile::remove(destPath);
 
     if (!QFile::copy(sourcePath, destPath)) {
-        emit message(QStringLiteral("Import failed: could not copy file into app data directory."));
+        emit message(tr("Import failed: could not copy file into app data directory."));
         return false;
     }
 
@@ -3057,7 +2189,7 @@ bool SherlockEngine::importSherlockShi(const QString &sourcePath)
     QFile::setPermissions(destPath, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ReadUser);
 
     const bool ok = loadSherlockShiFromDataDir();
-    if (ok) emit message(QStringLiteral("Imported sherlock.shi successfully."));
+    if (ok) emit message(tr("Imported sherlock.shi successfully."));
     return ok;
 }
 
@@ -3079,7 +2211,7 @@ bool SherlockEngine::loadSherlockShiFromDataDir()
     if (!r.ok) {
         m_hasImages = false;
         emit imagesChanged();
-        emit message(QStringLiteral("sherlock.shi present, but could not decode (see logs). Using placeholder icons."));
+        emit message(tr("sherlock.shi is present but could not be decoded. Using placeholder icons."));
         return false;
     }
 

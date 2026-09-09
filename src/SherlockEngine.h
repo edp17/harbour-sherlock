@@ -1,22 +1,13 @@
 #pragma once
 
-#include <sailfishapp.h>
 #include <QObject>
 #include <QVector>
 #include <QImage>
-#include <QElapsedTimer>
 #include <QVariantList>
 #include <QString>
-#include <QSettings>
-#include <QDateTime>
-#include <QHash>
+#include <QStringList>
 #include <QTimer>
 #include <QSet>
-#include <QJsonDocument>
-#include <QJsonArray>
-#include <QStandardPaths>
-#include <QDir>
-#include <QFile>
 #include "ClueSemantics.h"
 
 class SherlockEngine : public QObject
@@ -29,6 +20,8 @@ class SherlockEngine : public QObject
     Q_PROPERTY(QString dataDir READ dataDir CONSTANT)
 
     Q_PROPERTY(IconSource iconSource READ iconSource WRITE setIconSource NOTIFY iconSourceChanged)
+    Q_PROPERTY(QString iconTheme READ iconTheme WRITE setIconTheme NOTIFY iconThemeChanged)
+    Q_PROPERTY(QStringList availableIconThemes READ availableIconThemes NOTIFY iconThemesChanged)
 
     Q_PROPERTY(int iconEpoch READ iconEpoch NOTIFY imagesChanged)
     int iconEpoch() const { return m_iconEpoch; }
@@ -36,6 +29,7 @@ class SherlockEngine : public QObject
     Q_PROPERTY(QVariantList clueGroups READ clueGroups NOTIFY clueGroupsChanged)
     // DOS-authentic semantic clues derived from the solution
     Q_PROPERTY(QVariantList dosClueGroups READ dosClueGroups NOTIFY dosClueGroupsChanged)
+    Q_PROPERTY(QStringList dimmedClueKeys READ dimmedClueKeys NOTIFY dimmedCluesChanged)
 
     Q_PROPERTY(int puzzleSource READ puzzleSource NOTIFY puzzleIdentityChanged)
     Q_PROPERTY(int puzzleId READ puzzleId NOTIFY puzzleIdentityChanged)
@@ -105,6 +99,8 @@ public:
     QVariantList clues() const;
     QVariantList clueGroups() const;
     QVariantList dosClueGroups() const; // DOS-authentic semantic clues derived from the solution
+    QStringList dimmedClueKeys() const;
+    Q_INVOKABLE void toggleDimmedClue(const QString &key);
     bool hasImportedImages() const { return m_hasImages; }
 
     QString dataDir() const;
@@ -150,10 +146,14 @@ public:
 
     Q_PROPERTY(int hintCell READ hintCell NOTIFY hintChanged)
     Q_PROPERTY(int hintItem READ hintItem NOTIFY hintChanged)
+    Q_PROPERTY(bool hintEliminates READ hintEliminates NOTIFY hintChanged)
+    Q_PROPERTY(QString hintClueKey READ hintClueKey NOTIFY hintChanged)
     Q_PROPERTY(bool hasHint READ hasHint NOTIFY hintChanged)
 
     int hintCell() const { return m_hintCell; }   // 0..n*n-1, or -1
     int hintItem() const { return m_hintItem; }   // 0..n-1, or -1
+    bool hintEliminates() const { return m_hintEliminates; }
+    QString hintClueKey() const { return m_hintClueKey; }
     bool hasHint() const { return m_hintCell >= 0 && m_hintItem >= 0; }
 
     Q_INVOKABLE void hint();
@@ -162,6 +162,11 @@ public:
 
     IconSource iconSource() const { return m_iconSource; }
     void setIconSource(int v);
+    QString iconTheme() const { return m_iconTheme; }
+    Q_INVOKABLE void setIconTheme(const QString &theme);
+    QStringList availableIconThemes() const { return m_availableIconThemes; }
+    void setIconThemeRoot(const QString &path);
+    Q_INVOKABLE void refreshIconThemes();
 
     enum ClueOrient { Vertical = 0, Horizontal = 1 };
     Q_ENUM(ClueOrient)
@@ -208,6 +213,8 @@ signals:
     void imagesChanged();
     void message(const QString &text);
     void iconSourceChanged();
+    void iconThemeChanged();
+    void iconThemesChanged();
     void undoRedoChanged();
     void conflictCellsChanged();
     void solvedChanged();
@@ -215,6 +222,7 @@ signals:
     void puzzleIdentityChanged();
     void lastTouchedChanged();
     void dosClueGroupsChanged();
+    void dimmedCluesChanged();
     void elapsedSecondsChanged();
     void timerRunningChanged();
     void scoresChanged();
@@ -276,6 +284,12 @@ private:
     QVector<QImage> m_halfShi;
 
     IconSource m_iconSource {Generated};
+    QString m_iconTheme;
+    QString m_iconThemeRoot;
+    QStringList m_availableIconThemes;
+
+    bool isValidIconTheme(const QString &themeName) const;
+    QString resolveIconTheme(const QString &themeName) const;
 
     int m_undoLimit {50};
 
@@ -325,14 +339,18 @@ private:
         QVector<SemClue> clues;
     };
     QVector<SemClueGroup> m_dosClueGroups;
+    QSet<QString> m_dimmedClueKeys;
+    void clearDimmedClues();
 
     void pushUndoSnapshot();
     void clearRedo();
 
     int m_hintCell {-1};
     int m_hintItem {-1};
+    bool m_hintEliminates {false};
+    QString m_hintClueKey;
 
-    void setHint(int cell, int item);
+    void setHint(int cell, int item, bool eliminates, const QString &clueKey);
 
     PuzzleSource m_puzzleSource {GeneratedPuzzle};
     int m_puzzleId {-1};        // valid when Bank
@@ -369,9 +387,7 @@ private:
     void markCurrentBankPuzzleSolved();
     QSet<int> m_solvedBankIds; // for current m_size only
 
-    int ambiguousCellCount() const;
-    bool applyHiddenSinglesPass(bool &anyChange);
-    bool tryAutoCompleteTrivialFinish();
+    bool applyForcedRowCompletion();
 
     bool m_autoCompleteEnabled = false;
     bool m_inAutoComplete = false;

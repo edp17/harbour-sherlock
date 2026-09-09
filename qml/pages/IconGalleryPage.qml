@@ -1,3 +1,21 @@
+/*
+    Copyright (C) 2026 edp17 and chatGPT
+
+    This file is part of harbour-sherlock.
+
+    The harbour-sherlock is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    The harbour-sherlock is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with the harbour-sherlock. If not, see <http://www.gnu.org/licenses/>.
+*/
 import QtQuick 2.6
 import Sailfish.Silica 1.0
 
@@ -17,14 +35,14 @@ Page
             width: parent.width
             spacing: Theme.paddingLarge
 
-            PageHeader { title: "SHI Tile Gallery" }
+            PageHeader { title: qsTr("SHI tile gallery") }
 
             Label
             {
                 x: Theme.horizontalPageMargin
                 width: parent.width - 2*x
                 wrapMode: Text.WordWrap
-                text: "Tiles 1..36 map to row-major (A..F × 1..6). Tile 0 is typically blank (shown as empty below)."
+                text: qsTr("Tiles 1–36 map to row-major order (A–F × 1–6). Tile 0 is normally blank.")
                 color: Theme.secondaryColor
             }
 
